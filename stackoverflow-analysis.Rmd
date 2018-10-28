@@ -1,28 +1,31 @@
 ---
 title: "stackoverflow-analysis"
-output: html_document
+output:
+  pdf_document: default
+  html_document: default
 ---
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-## R Markdown
+```{r files}
+library(XML)
 
-This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+convertXMLToDf <- function(filePath, query){
+  #load the xml doc
+  doc <- xmlParse(filePath)
+  #return the top node of the xml file
+  rootnode <- xmlRoot(doc)
+  #return the set of xml nodes
+  nodeset <- getNodeSet(rootnode, query)
+  return(XML:::xmlAttrsToDataFrame(nodeset))
+}
 
-When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+#convert to dataframe
+Posts_df <- convertXMLToDf("data/Posts_500k.xml", "//row")
 
-```{r cars}
-summary(cars)
+
 ```
 
-## Including Plots
 
-You can also embed plots, for example:
-
-```{r pressure, echo=FALSE}
-plot(pressure)
-```
-
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
