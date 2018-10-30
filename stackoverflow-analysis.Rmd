@@ -10,9 +10,10 @@ knitr::opts_chunk$set(echo = TRUE)
 ```
 
 ```{r files}
+
 library(XML)
 
-convertXMLToDf <- function(filePath, query){
+readXMLToDf <- function(filePath, query){
   #load the xml doc
   doc <- xmlParse(filePath)
   #return the top node of the xml file
@@ -23,9 +24,12 @@ convertXMLToDf <- function(filePath, query){
 }
 
 #convert to dataframe
-Posts_df <- convertXMLToDf("data/Posts_500k.xml", "//row")
+Posts_df <- readXMLToDf("data/Posts_500k.xml", "//posts/row")
+#export as csv
+write.csv(Posts_df, "data//Posts_500k.csv")
 
 
-```
+
+
 
 
