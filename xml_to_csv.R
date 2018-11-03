@@ -12,27 +12,25 @@ ReadXMLToDf <- function(filepath, query){
 }
 
 
-#convert to dataframe
-tags.df <- ReadXMLToDf("data/Tags.xml", "//tags/row")
-#export as csv
-write.csv(tags.df, "data//Tags.csv")
+#import to dataframe
+posts_df <- ReadXMLToDf("data/Posts_500k.xml", "//posts/row")
+comments_df <- ReadXMLToDf("data/Comments.xml", "//comments/row")
+tags_df <- ReadXMLToDf("data/Tags.xml", "//tags/row")
+users_df <- ReadXMLToDf("data/Users.xml", "//users/row")
 
-#convert to dataframe
-comments.df <- ReadXMLToDf("data/Comments.xml", "//comments/row")
-#export as csv
-write.csv(comments.df, "data//Comments.csv")
+#select all the post ids
+post_ids <- as.numeric(paste(posts_df$Id))
 
-#convert to dataframe
-users.df <- ReadXMLToDf("data/Users.xml", "//users/row")
-#export as csv
-write.csv(users.df, "data//Users.csv")
-
-#convert to dataframe
-posts.df <- ReadXMLToDf("data/Posts_500k.xml", "//posts/row")
+#filter comments dataframe to contain rows that are also in posts dataframe
+comments_df <- filter(comments_df, PostId %in% post_ids)
 
 #separate questions and answers into different dataframes
-questions.df <- filter(posts.df, PostTypeId == 1)
-answers.df <- filter(posts.df, PostTypeId == 2)
+questions_df <- filter(posts_df, PostTypeId == 1)
+answers_df <- filter(posts_df, PostTypeId == 2)
 
-write.csv(questions.df, "data//Questions.csv")
-write.csv(answers.df, "data//Answers.csv")
+#export as csv
+write.csv(questions_df, "data//Questions.csv")
+write.csv(answers_df, "data//Answers.csv")
+write.csv(comments_df, "data//Comments.csv")
+write.csv(users_df, "data//Users.csv")
+write.csv(tags_df, "data//Tags.csv")
