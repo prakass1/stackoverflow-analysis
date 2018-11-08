@@ -11,6 +11,6 @@ ReadXMLToDf <- function(filepath, query){
   return(XML:::xmlAttrsToDataFrame(nodeset))
 }
 
-write2csv <- function(df,loc){
-  write.csv(df,loc)
+write2csv <- function(df, loc){
+  write_csv(df, loc)
 }

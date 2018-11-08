@@ -34,7 +34,7 @@ if(count!=4){
   start_time <- Sys.time()
   for(val in ne_csvs){
      #Assign each parsed vals to dataframe
-     assign(paste0(val,"_df"), ReadXMLToDf(paste0(xml_loc,val,".xml"), paste0("//",val,"/row")))
+     assign(paste0(val, "_df"), ReadXMLToDf(paste0(xml_loc, val, ".xml"), paste0("//", val, "/row")))
   }
 }
 end_time <- Sys.time()
@@ -51,7 +51,7 @@ for(val in ne_csvs){
 print(paste0("Writing to csv completed ....."))
 #About 5min and 25 seconds
 
-#Save some memory
+#save some memory
 if(exists('dfs')){
   remove(dfs)
 }

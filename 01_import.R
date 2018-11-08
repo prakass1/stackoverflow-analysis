@@ -7,10 +7,6 @@ start_time <- Sys.time()
 posts <- read_csv(paste0(csv_loc, "posts.csv"))
 comments <- read_csv(paste0(csv_loc, "comments.csv"))
 
-#drop the first column
-posts <- select(posts, -X1)
-comments <- select(comments, -X1)
-
 posts %>% head(1)
 comments %>% head(1)
 end_time <- Sys.time()
