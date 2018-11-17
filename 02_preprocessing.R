@@ -1,5 +1,6 @@
 library("stringr")
 library("gsubfn")
+library("ggplot2")
 #select all the post ids
 post_ids <- posts$Id
 #filter comments dataframe to contain rows that are also in posts dataframe
@@ -20,7 +21,7 @@ selected_tags_count <- tbl_df(tags) %>%
                  top_n(25,Count) %>%
                  select(TagName,Count) 
 
-selected_tags_count <- arrange(selected_tags,desc(Count))
+selected_tags_count <- arrange(selected_tags_count,desc(Count))
 
 
 selected_tags <- selected_tags_count$TagName
@@ -45,3 +46,8 @@ questions["Tags"] <- apply(questions["Tags"],1,filterTags)
 #### Filter to only have tags and remove <> tags
 question_filtered <- questions %>%
                     filter(!grepl("<", Tags))
+
+
+
+# Very basic bar graph
+ggplot(data=question_filtered, aes(x=Tags,fill=Tags)) + geom_bar(stat="count")

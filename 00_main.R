@@ -1,15 +1,9 @@
 # 00_main.R
 # A wrapper to run all R scripts
+library("tryCatchLog")
+#Source configurations first
+source("SO_config.R")
 
-xml_loc <- "F://xml_locations//"
-csv_loc <- "F://csv_location//"
-ext <- ".csv"
-
-#This will help with automatically processing only those files not processed
-files <- c("posts",
-           "comments",
-           "tags",
-           "users")
 xmls <- c()
 ne_csvs <- c()
 
@@ -36,8 +30,14 @@ if(count!=4){
   start_time <- Sys.time()
   for(val in ne_csvs){
      #Assign each parsed vals to dataframe
-     assign(paste0(val, "_df"), ReadXMLToDf(paste0(xml_loc, val, ".xml"), paste0("//", val, "/row")))
-  }
+     print("begin")
+    # Attempt to use logging functionality: 
+    # https://cran.r-project.org/web/packages/tryCatchLog/vignettes/tryCatchLog-intro.html ##
+     tryLog(assign(paste0(val, "_df"), 
+                   ReadXMLToDf(paste0(xml_loc, val, ".xml"), 
+                   paste0("//", val, "/row"))))
+     print("end")
+     }
 }
 end_time <- Sys.time()
 time_taken <- difftime(end_time, start_time, units='mins')
@@ -47,8 +47,10 @@ print(paste0("Time Taken for creating dataframe is ", time_taken))
 #export as csv
 print(paste0("Begin writing to csv ....."))
 for(val in ne_csvs){
-  dfs <- eval(parse(text=paste0(val, "_df")))
-  WriteToCsv(dfs, paste0(csv_loc, val, ext))
+  if(exists(paste0(val,"_df"))){
+    dfs <- eval(parse(text=paste0(val, "_df")))
+    WriteToCsv(dfs, paste0(csv_loc, val, ext))
+  }
 }
 print(paste0("Writing to csv completed ....."))
 #About 5min and 25 seconds
