@@ -1,13 +1,15 @@
 # 00_main.R
 # A wrapper to run all R scripts
 
-xml_loc <- "data/"
-csv_loc <- "data/"
+xml_loc <- "F://xml_locations//"
+csv_loc <- "F://csv_location//"
 ext <- ".csv"
-files <- c("posts")
-           #"comments")
-           #"tags",
-           #"users")
+
+#This will help with automatically processing only those files not processed
+files <- c("posts",
+           "comments",
+           "tags",
+           "users")
 xmls <- c()
 ne_csvs <- c()
 
@@ -64,6 +66,16 @@ if(exists('comments_df')){
   remove(comments_df)
 }
 
+if(exists('tags_df')){
+  remove(tags_df)
+}
 
-#import csv to df
+if(exists('users_df')){
+  remove(users_df)
+}
+
+
+#import csv to Data Frame
 source('01_import.R')
+#Perform Preprocessing to Prepare Data
+source('02_preprocessing.R')

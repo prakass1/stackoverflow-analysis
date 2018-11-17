@@ -41,9 +41,7 @@ comments_names <- c("Id",
 start_time <- Sys.time()
 posts <- read_csv(paste0(csv_loc, "posts.csv"))
 comments <- read_csv(paste0(csv_loc, "comments.csv"))
+tags <- read_csv(paste0(csv_loc, "tags.csv"))
 end_time <- Sys.time()
 time_taken <- difftime(end_time, start_time, units='mins')
 print(paste0("Time Taken for reading dataframe is ", time_taken))
-
-
-
