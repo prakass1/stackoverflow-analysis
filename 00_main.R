@@ -4,8 +4,8 @@
 xml_loc <- "data/"
 csv_loc <- "data/"
 ext <- ".csv"
-files <- c("posts",
-           "comments")
+files <- c("posts")
+           #"comments")
            #"tags",
            #"users")
 xmls <- c()
@@ -46,7 +46,7 @@ print(paste0("Time Taken for creating dataframe is ", time_taken))
 print(paste0("Begin writing to csv ....."))
 for(val in ne_csvs){
   dfs <- eval(parse(text=paste0(val, "_df")))
-  write2csv(dfs, paste0(csv_loc, val, ext))
+  WriteToCsv(dfs, paste0(csv_loc, val, ext))
 }
 print(paste0("Writing to csv completed ....."))
 #About 5min and 25 seconds

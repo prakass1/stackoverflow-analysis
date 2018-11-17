@@ -11,6 +11,12 @@ ReadXMLToDf <- function(filepath, query){
   return(XML:::xmlAttrsToDataFrame(nodeset))
 }
 
-write2csv <- function(df, loc){
+WriteToCsv <- function(df, loc){
   write_csv(df, loc)
+}
+
+
+RemoveHTML <- function(df){
+    #non-greedy search and replace for HTML tags
+    mutate(df, Body = str_replace_all(Body,"<(.*?)>", ""))
 }
