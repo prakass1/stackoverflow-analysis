@@ -25,7 +25,6 @@ question_cols_filtered <- c("Id",
                             "Tags",
                             "AnswerCount",
                             "FavoriteCount")
-<<<<<<< HEAD
 
 answers_cols_filtered <- c("Id",
                           "CreationDate",
@@ -47,7 +46,6 @@ answers_sel <- answers[answers_cols_filtered]
 ##Transform Date to yyyy/mm/dd format
 
 class(questions_sel$CreationDate)
-=======
 
 ##Transform Date to mm/dd/yyyy format
 
@@ -56,13 +54,11 @@ class(questions_sel$CreationDate)
 #remove html tags from the body column
 #questions <- RemoveHTML(questions)
 #answers <- RemoveHTML(answers)
->>>>>>> afa1ddf618c0faa6909a56e2f376e5416319c7f7
 
 questions_sel <- questions_sel %>%
                  transform(CreationDate = as.Date(CreationDate, tryFormats = c("%Y%m%d"))) %>%
                  transform(LastActivityDate = as.Date(LastActivityDate, tryFormats = c("%Y%m%d")))
 
-<<<<<<< HEAD
 answers_sel <- answers_sel %>%
   transform(CreationDate = as.Date(CreationDate, tryFormats = c("%Y%m%d")))
 
@@ -114,7 +110,6 @@ answers_sel <- answers_sel %>%
 # selected_tags <- selected_tags_count$TagName
 
 
-=======
 ###Select only those 20 top tags by count########
 # selected_tags_count <- tbl_df(tags) %>%
 #                  top_n(15,Count) %>%
@@ -126,7 +121,6 @@ answers_sel <- answers_sel %>%
 # selected_tags <- selected_tags_count$TagName
 
 
->>>>>>> afa1ddf618c0faa6909a56e2f376e5416319c7f7
 #15 selected tags
 selected_tags <- c("android",
                    "c",
@@ -174,12 +168,10 @@ questions["Tags"] <- apply(questions["Tags"],1,filterTags)
 #### Filter to only have tags and remove <> tags
 question_filtered <- questions %>%
                     filter(grepl("<", Tags))
-<<<<<<< HEAD
-=======
+
 
 # Plot the frequency of Tags in the dataset
 ggplot(data=question_filtered, aes(x=Tags,fill=Tags)) + geom_bar(stat="count")
->>>>>>> afa1ddf618c0faa6909a56e2f376e5416319c7f7
 
 # Plot the frequency of Tags in the dataset
 ggplot(data=question_filtered, aes(x=Tags,fill=Tags)) + geom_bar(stat="count")
@@ -226,9 +218,6 @@ dev.off()
 graphics.off()
 
 
-<<<<<<< HEAD
-=======
-
 
 
 ##### Do one tag summarization
@@ -266,6 +255,3 @@ ggplot(val, aes(x=Tags,y=sum_score,fill=sum_answer_count)) +
 
 dev.off()
 graphics.off()
-
-
->>>>>>> afa1ddf618c0faa6909a56e2f376e5416319c7f7
