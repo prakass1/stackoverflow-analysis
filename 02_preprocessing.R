@@ -3,6 +3,8 @@ library("gsubfn")
 library("ggplot2")
 library("stringr")
 library("lubridate")
+library("rvest")
+library("corrplot")
 #select all the post ids
 post_ids <- posts$Id
 #filter comments dataframe to contain rows that are also in posts dataframe
@@ -24,6 +26,7 @@ question_cols_filtered <- c("Id",
                             "Title",
                             "Tags",
                             "AnswerCount",
+                            "CommentCount",
                             "FavoriteCount")
 
 answers_cols_filtered <- c("Id",
@@ -82,7 +85,7 @@ questions_sel[is.na(questions_sel)] <- 0
 # Check and add a new column as hasCodeTag to see if there is already a code
 questions_sel <- questions_sel %>%
                  mutate(hasCodeTag = case_when(grepl("<code>",Body,fixed=TRUE) == 1 ~ 1, TRUE ~ 0)) %>%
-                 mutate(hasLinks = case_when(grepl("http://",Body,fixed=TRUE) == 1 ~ 1, TRUE ~ 0))
+                 mutate(hasLinks = case_when(grepl("<a href",Body,fixed=TRUE) == 1 ~ 1, TRUE ~ 0))
 
 answers_sel <- answers_sel %>%
                 mutate(hasCodeTag = case_when(grepl("<code>",Body,fixed=TRUE) == 1 ~ 1, TRUE ~ 0)) %>%
@@ -164,9 +167,9 @@ filterOneTag <- function(x){
 
 #### Filter to have only the top 25 tags by questions######
 ## May be we can give our custom tags too ##########
-questions["Tags"] <- apply(questions["Tags"],1,filterTags)
+questions_sel["Tags"] <- apply(questions_sel["Tags"],1,filterTags)
 #### Filter to only have tags and remove <> tags
-question_filtered <- questions %>%
+question_filtered <- questions_sel %>%
                     filter(grepl("<", Tags))
 
 
@@ -183,6 +186,24 @@ val <- questions %>%
                  sum_score = sum(Score)) %>%
   #top_n(5,avg_answer_count) %>%
        select(Tags,sum_answer_count,sum_comment_count,sum_score)
+
+val$Tags
+
+
+
+###### Correlations ###############
+score_questions <- question_filtered %>%
+                   arrange(desc(Score)) %>%
+                   select(Score,hasCodeTag,hasLinks,AnswerCount,CommentCount,FavoriteCount)
+
+scoresCol <- cor(score_questions)
+
+corrplot(scoresCol, method="color",  
+         type="lower", order="hclust", 
+         addCoef.col = "black", # Add coefficient of correlation
+         tl.col="black", tl.srt=0, #Text label color and rotation
+         # hide correlation coefficient on the principal diagonal
+         diag=FALSE )
 
 # Plot answer_counts aggregated with Tags
 angle <- theme(axis.text.x = element_text(angle=60))
