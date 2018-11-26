@@ -3,6 +3,8 @@ library("gsubfn")
 library("ggplot2")
 library("stringr")
 library("lubridate")
+library("rvest")
+library("corrplot")
 #select all the post ids
 post_ids <- posts$Id
 #filter comments dataframe to contain rows that are also in posts dataframe
@@ -24,6 +26,7 @@ question_cols_filtered <- c("Id",
                             "Title",
                             "Tags",
                             "AnswerCount",
+                            "CommentCount",
                             "FavoriteCount")
 
 answers_cols_filtered <- c("Id",
@@ -82,7 +85,7 @@ questions_sel[is.na(questions_sel)] <- 0
 # Check and add a new column as hasCodeTag to see if there is already a code
 questions_sel <- questions_sel %>%
                  mutate(hasCodeTag = case_when(grepl("<code>",Body,fixed=TRUE) == 1 ~ 1, TRUE ~ 0)) %>%
-                 mutate(hasLinks = case_when(grepl("http://",Body,fixed=TRUE) == 1 ~ 1, TRUE ~ 0))
+                 mutate(hasLinks = case_when(grepl("<a href",Body,fixed=TRUE) == 1 ~ 1, TRUE ~ 0))
 
 answers_sel <- answers_sel %>%
                 mutate(hasCodeTag = case_when(grepl("<code>",Body,fixed=TRUE) == 1 ~ 1, TRUE ~ 0)) %>%
@@ -164,22 +167,12 @@ filterOneTag <- function(x){
 
 #### Filter to have only the top 25 tags by questions######
 ## May be we can give our custom tags too ##########
-questions["Tags"] <- apply(questions["Tags"],1,filterTags)
+questions_sel["Tags"] <- apply(questions_sel["Tags"],1,filterTags)
 #### Filter to only have tags and remove <> tags
-question_filtered <- questions %>%
+question_filtered <- questions_sel %>%
                     filter(grepl("<", Tags))
 
 
-# Plot the frequency of Tags in the dataset
-ggplot(data=question_filtered, aes(x=Tags,fill=Tags)) + geom_bar(stat="count")
-
-# Plot the frequency of Tags in the dataset
-ggplot(data=question_filtered, aes(x=Tags,fill=Tags)) + geom_bar(stat="count")
-
-
-
-
-
 
 ##### Do one tag summarization
 
@@ -194,44 +187,23 @@ val <- questions %>%
   #top_n(5,avg_answer_count) %>%
        select(Tags,sum_answer_count,sum_comment_count,sum_score)
 
-# Plot answer_counts aggregated with Tags
-angle <- theme(axis.text.x = element_text(angle=60))
-pdf(file="plots_questions.pdf",paper = "a4" )
-ggplot(questions, aes(x=Tags,fill=Tags)) + 
-  geom_bar(stat = "count") + 
-  ggtitle("Frequency of Tags") + 
-  angle
-ggplot(val, aes(x=Tags,y=sum_answer_count,fill=sum_answer_count)) +
-  geom_bar(stat = "identity") +
-  ggtitle("Tag Distribution on Answers") +
-  angle
-ggplot(val, aes(x=Tags,y=sum_comment_count,fill=sum_answer_count)) + 
-  geom_bar(stat = "identity") + 
-  ggtitle("Tag Distribution on Comment") +
-  angle
-ggplot(val, aes(x=Tags,y=sum_score,fill=sum_answer_count)) + 
-  geom_bar(stat = "identity") + 
-  ggtitle("Tag Distribution on Score") +
-  angle
-
-dev.off()
-graphics.off()
+val$Tags
 
 
 
+###### Correlations ###############
+score_questions <- question_filtered %>%
+                   arrange(desc(Score)) %>%
+                   select(Score,hasCodeTag,hasLinks,AnswerCount,CommentCount,FavoriteCount)
 
-##### Do one tag summarization
+scoresCol <- cor(score_questions)
 
-questions["Tags"] <- apply(questions["Tags"],1,filterOneTag)
-questions <- questions %>% filter(Tags!="")
-
-val <- questions %>%
-       group_by(Tags) %>%
-       summarise(sum_answer_count = sum(AnswerCount),
-                 sum_comment_count = sum(CommentCount),
-                 sum_score = sum(Score)) %>%
-  #top_n(5,avg_answer_count) %>%
-       select(Tags,sum_answer_count,sum_comment_count,sum_score)
+corrplot(scoresCol, method="color",  
+         type="lower", order="hclust", 
+         addCoef.col = "black", # Add coefficient of correlation
+         tl.col="black", tl.srt=0, #Text label color and rotation
+         # hide correlation coefficient on the principal diagonal
+         diag=FALSE )
 
 # Plot answer_counts aggregated with Tags
 angle <- theme(axis.text.x = element_text(angle=60))
@@ -244,11 +216,11 @@ ggplot(val, aes(x=Tags,y=sum_answer_count,fill=sum_answer_count)) +
   geom_bar(stat = "identity") +
   ggtitle("Tag Distribution on Answers") +
   angle
-ggplot(val, aes(x=Tags,y=sum_comment_count,fill=sum_answer_count)) + 
+ggplot(val, aes(x=Tags,y=sum_comment_count,fill=sum_comment_count)) + 
   geom_bar(stat = "identity") + 
   ggtitle("Tag Distribution on Comment") +
   angle
-ggplot(val, aes(x=Tags,y=sum_score,fill=sum_answer_count)) + 
+ggplot(val, aes(x=Tags,y=sum_score,fill=sum_score)) + 
   geom_bar(stat = "identity") + 
   ggtitle("Tag Distribution on Score") +
   angle
