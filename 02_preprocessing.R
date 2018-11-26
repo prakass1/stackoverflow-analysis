@@ -1,3 +1,6 @@
+# 02_preprocessing.R
+# data cleaning and preprocessing
+
 library("stringr")
 library("gsubfn")
 library("ggplot2")
@@ -5,225 +8,168 @@ library("stringr")
 library("lubridate")
 library("rvest")
 library("corrplot")
-#select all the post ids
-post_ids <- posts$Id
-#filter comments dataframe to contain rows that are also in posts dataframe
-comments <- filter(comments, PostId %in% post_ids)
-
-#separate questions and answers into different dataframes
-questions <- filter(posts, PostTypeId == 1)
-answers <- filter(posts, PostTypeId == 2)
-
-
-## Use only selective columns
-question_cols_filtered <- c("Id",
-                            "PostTypeId",
-                            "CreationDate",
-                            "Score",
-                            "ViewCount",
-                            "Body",
-                            "LastActivityDate",
-                            "Title",
-                            "Tags",
-                            "AnswerCount",
-                            "CommentCount",
-                            "FavoriteCount")
-
-answers_cols_filtered <- c("Id",
-                          "CreationDate",
-                          "Score",
-                          "Body",
-                          "CommentCount",
-                          "ParentId")
 
 
 
 
+############ Preprocess Posts ############
+
+# 1. separate question posts and answer posts into different dataframes
+# 2. keep only the relevant columns in questions and answers
+# 3. remove the time part of the datetime fields in questions and answers
+# 4. convert the Nas in questions to zeros
+# 5. select the questions having the top 15 selected tags
+# 6. extract links and code from posts and move them to separate columns
+# 7. add new columns HasCode and HasLinks
 
 
-#Selected Columns for question and answers
-questions_sel <- questions[question_cols_filtered]
-answers_sel <- answers[answers_cols_filtered]
+# posts contain questions which are PostTypeId 1 and answers are PostTypeId 2,
+# so they can be separated into different dataframes
+questions <- posts %>% 
+    filter(PostTypeId == 1)
+answers <- posts %>% 
+    filter(PostTypeId == 2)
+
+# remove the posts dataframe to save memory
+rm(posts)
 
 
-##Transform Date to yyyy/mm/dd format
+# some columns aren't relevant, so only the useful columns need to be kept 
+# and the others can be removed
+questions_cols <- c("Id", 
+                    "PostTypeId", 
+                    "CreationDate", 
+                    "Score",
+                    "ViewCount",
+                    "Body",
+                    "OwnerUserId",
+                    "LastActivityDate",
+                    "Title",
+                    "Tags",
+                    "AnswerCount",
+                    "CommentCount",
+                    "FavoriteCount")
 
-class(questions_sel$CreationDate)
+answers_cols <- c("Id",
+                  "CreationDate",
+                  "Score",
+                  "Body",
+                  "OwnerUserId",
+                  "CommentCount",
+                  "ParentId")
 
-##Transform Date to mm/dd/yyyy format
+# keep only selective columns
+questions <- questions %>% 
+    select(questions_cols)
+answers <- answers %>% 
+    select(answers_cols)
 
-
-
-#remove html tags from the body column
-#questions <- RemoveHTML(questions)
-#answers <- RemoveHTML(answers)
-
-questions_sel <- questions_sel %>%
-                 transform(CreationDate = as.Date(CreationDate, tryFormats = c("%Y%m%d"))) %>%
-                 transform(LastActivityDate = as.Date(LastActivityDate, tryFormats = c("%Y%m%d")))
-
-answers_sel <- answers_sel %>%
-  transform(CreationDate = as.Date(CreationDate, tryFormats = c("%Y%m%d")))
-
-
-### Make all NA cols to 0 for not having any NULLS
-questions_sel[is.na(questions_sel)] <- 0
-
-
-#### Check <code> tag and add a new column called hasCode
-# hasCodeTag <- function(x) {
-#   
-#               if(grapl("<code>",x,fixed=TRUE)){
-#                   return(1)
-#               }
-#               else{
-#                 return(0)
-#               }
-#               }
+# remove the time part of the datetime columns as time isn't meaningful 
+questions <- questions %>%
+    transform(CreationDate = as.Date(CreationDate, tryFormats = c("%Y%m%d"))) %>%
+    transform(LastActivityDate = as.Date(LastActivityDate, tryFormats = c("%Y%m%d")))
+# same as above
+answers <- answers %>%
+    transform(CreationDate = as.Date(CreationDate, tryFormats = c("%Y%m%d")))
 
 
-# Check and add a new column as hasCodeTag to see if there is already a code
-questions_sel <- questions_sel %>%
-                 mutate(hasCodeTag = case_when(grepl("<code>",Body,fixed=TRUE) == 1 ~ 1, TRUE ~ 0)) %>%
-                 mutate(hasLinks = case_when(grepl("<a href",Body,fixed=TRUE) == 1 ~ 1, TRUE ~ 0))
-
-answers_sel <- answers_sel %>%
-                mutate(hasCodeTag = case_when(grepl("<code>",Body,fixed=TRUE) == 1 ~ 1, TRUE ~ 0)) %>%
-                mutate(hasLinks = case_when(grepl("http://",Body,fixed=TRUE) == 1 ~ 1, TRUE ~ 0))
-  
-### Extract links in the text
+# make all NA cols to 0 for not having any NULLS
+questions[is.na(questions)] <- 0
 
 
 
-
-
-#remove html tags from the body column
-#questions <- RemoveHTML(questions)
-#answers <- RemoveHTML(answers)
-
-
-###Select only those 20 top tags by count########
-# selected_tags_count <- tbl_df(tags) %>%
-#                  top_n(15,Count) %>%
-#                  select(TagName,Count) 
-# 
-# selected_tags_count <- arrange(selected_tags_count,desc(Count))
-# 
-# 
-# selected_tags <- selected_tags_count$TagName
-
-
-###Select only those 20 top tags by count########
-# selected_tags_count <- tbl_df(tags) %>%
-#                  top_n(15,Count) %>%
-#                  select(TagName,Count) 
-# 
-# selected_tags_count <- arrange(selected_tags_count,desc(Count))
-# 
-# 
-# selected_tags <- selected_tags_count$TagName
-
-
-#15 selected tags
-selected_tags <- c("android",
-                   "c",
-                   "c#",
-                   "c++",
-                   "html",
-                   "css",
-                   "ios",
-                   "java",
-                   "javascript",
-                   "jquery",
-                   "mysql",
-                   "php",
-                   "python",
-                   "r",
-                   "sql")
-
-filterTags <- function(x){
-            for(tag in selected_tags){
-              testExpr <- paste0("<",tag,">")
-            if(grepl(testExpr,x,fixed = TRUE)){
-              return(x)
-            }
-
-            }
-  return("")
-}
-
-
-#### Filter as one tag -- This is purely for Visualizations ####
-filterOneTag <- function(x){
-  for(tag in selected_tags){
-    testExpr <- paste0("<",tag,">")
-    if(grepl(testExpr,x,fixed = TRUE)){
-      return(tag)
-    }
-    
-  }
-  return("")
-}
-
-#### Filter to have only the top 25 tags by questions######
+#### Filter to have only the top 15 tags by questions######
 ## May be we can give our custom tags too ##########
-questions_sel["Tags"] <- apply(questions_sel["Tags"],1,filterTags)
-#### Filter to only have tags and remove <> tags
-question_filtered <- questions_sel %>%
-                    filter(grepl("<", Tags))
+
+# apply the filterTags function on the values in the Tags column. 
+# This will replace the tags with empty strings, if they are not in the top 15 selected tags
+questions["Tags"] <- apply(questions["Tags"], 1, filterTags)
+# remove the questions that do not have a top 15 tag
+questions <- questions %>% 
+    filter(Tags != "")
 
 
 
-##### Do one tag summarization
+# extract links from questions and answers body and place them in new columns 
+questions$Links <- lapply(questions$Body, GetLinks)
+answers$Links <- lapply(answers$Body, GetLinks)
 
-questions["Tags"] <- apply(questions["Tags"],1,filterOneTag)
-questions <- questions %>% filter(Tags!="")
+# extract code from questions and answers body and place them in new columns 
+questions$Code <- lapply(questions$Body, GetCode)
+answers$Code <- lapply(answers$Body, GetCode)
 
-val <- questions %>%
-       group_by(Tags) %>%
-       summarise(sum_answer_count = sum(AnswerCount),
-                 sum_comment_count = sum(CommentCount),
-                 sum_score = sum(Score)) %>%
-  #top_n(5,avg_answer_count) %>%
-       select(Tags,sum_answer_count,sum_comment_count,sum_score)
+# create a new column HasLinks, which contains 1 if the post body contains links, 0 otherwise
+questions <- questions %>% 
+    mutate(HasLinks = if_else(Links != "", 1, 0))
+answers <- answers %>% 
+    mutate(HasLinks = if_else(Links != "", 1, 0))
 
-val$Tags
+# create a new column HasCode, which contains 1 if the post body contains code, 0 otherwise
+questions <- questions %>% 
+    mutate(HasCode = if_else(Code != "", 1, 0))
+answers <- answers %>% 
+    mutate(HasCode = if_else(Code != "", 1, 0))
+
+# this code extracts the <p> tags from the Body column and replaces
+# the column with the contents inside the <p> tags. This removes the
+# links and code, and keeps only the text
+questions$Body <- lapply(questions$Body, function(x){
+    body <- read_html(x) %>% 
+        html_nodes("p") %>% 
+        html_text()
+    return (paste(body, collapse=","))
+})
+# same as above
+answers$Body <- lapply(answers$Body, function(x){
+    body <- read_html(x) %>% 
+        html_nodes("p") %>% 
+        html_text()
+    return (paste(body, collapse=","))
+})
 
 
 
-###### Correlations ###############
-score_questions <- question_filtered %>%
-                   arrange(desc(Score)) %>%
-                   select(Score,hasCodeTag,hasLinks,AnswerCount,CommentCount,FavoriteCount)
+#############################################
 
-scoresCol <- cor(score_questions)
 
-corrplot(scoresCol, method="color",  
-         type="lower", order="hclust", 
-         addCoef.col = "black", # Add coefficient of correlation
-         tl.col="black", tl.srt=0, #Text label color and rotation
-         # hide correlation coefficient on the principal diagonal
-         diag=FALSE )
 
-# Plot answer_counts aggregated with Tags
-angle <- theme(axis.text.x = element_text(angle=60))
-pdf(file="plots_questions.pdf",paper = "a4" )
-ggplot(questions, aes(x=Tags,fill=Tags)) + 
-  geom_bar(stat = "count") + 
-  ggtitle("Frequency of Tags") + 
-  angle
-ggplot(val, aes(x=Tags,y=sum_answer_count,fill=sum_answer_count)) +
-  geom_bar(stat = "identity") +
-  ggtitle("Tag Distribution on Answers") +
-  angle
-ggplot(val, aes(x=Tags,y=sum_comment_count,fill=sum_comment_count)) + 
-  geom_bar(stat = "identity") + 
-  ggtitle("Tag Distribution on Comment") +
-  angle
-ggplot(val, aes(x=Tags,y=sum_score,fill=sum_score)) + 
-  geom_bar(stat = "identity") + 
-  ggtitle("Tag Distribution on Score") +
-  angle
 
-dev.off()
-graphics.off()
+
+
+
+
+
+
+
+############ Preprocess Comments ############
+
+# 1. filter out the comments that are not present in the questions and the answers dataframe
+# 2. keep only the relevant columns in comments
+# 3. remove the time part of the CreationDate column
+
+# select all the post ids and filter the comments dataframe to contain 
+# entries that are also in the questions and answers dataframes
+questions_and_answers <- c(pull(questions, Id), pull(answers, Id))
+comments <- comments %>% 
+    filter(PostId %in% questions_and_answers)
+
+comments_cols <- c("Id",
+                   "PostId",
+                   "Score",
+                   "Text",
+                   "CreationDate",
+                   "UserId")
+
+# keep only selected columns
+comments <- comments %>% 
+    select(comments_cols)
+
+
+# remove the time part of the CreationDate column as time is not meaningful
+comments <- comments %>% 
+    mutate(CreationDate = as.Date(CreationDate, tryformats=c("Y%m%d")))
+
+#############################################
+
+
+
