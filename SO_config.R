@@ -1,18 +1,18 @@
-#StackOverflow Configurations
-#SO_config
+# SO_config.R
+# StackOverflow Configurations
 
-xml_loc <- "F://xml_locations//"
-csv_loc <- "F://csv_location//"
+xml_loc <- "data/"
+csv_loc <- "data/"
 
 ### For Other OS ############
-#xml_loc <- "/data/"
-#csv_loc <- "/data/"
+# xml_loc <- "/data/"
+# csv_loc <- "/data/"
 
 
 #### Used extension #####
 ext <- ".csv"
 
-#This will help with automatically processing only those files not processed
+# This will help with automatically processing only those files not processed
 files <- c("posts",
            "comments",
            "tags",
