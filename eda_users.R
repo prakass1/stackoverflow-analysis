@@ -44,3 +44,17 @@ wordcloud(words$word , words$count,
 
 
 
+# predict gender from name
+genders <- users$DisplayName %>% 
+    gender()
+
+# plot gender distribution
+ggplot(genders, aes(x = factor(1), fill = factor(gender))) +
+    geom_bar(width = 1) +
+    coord_polar(theta = "y") +
+    labs(x = "", y = "", title = "Gender Distribution") +
+    scale_fill_discrete(name = "") +
+    theme_bw()
+
+
+
