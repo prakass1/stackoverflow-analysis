@@ -24,13 +24,6 @@ WriteToCsv <- function(df, loc){
 }
 
 
-# non-greedy search and replace for HTML tags
-# input: @df: a dataframe
-RemoveHTML <- function(df){
-    mutate(df, Body = str_replace_all(Body,"<(.*?)>", ""))
-}
-
-
 
 
 #15 selected tags
@@ -117,3 +110,82 @@ GetCode <- function(x){
     return (paste(code, collapse=","))
 }
 
+
+# input: @x: a character vector.
+# extracts all contents inside <p> tags using rvest functions
+# returns the contents as one character vector separated by periods
+GetParagraphContents <- function (x) {
+    if (grepl ("<p>", x, fixed = TRUE) == TRUE) {
+        x <- read_html (x) %>% 
+            html_nodes ("p") %>% 
+            html_text ( ) 
+        return (paste(x, collapse="."))
+    }
+    else {
+        return (x)
+    }
+}
+
+
+
+# input: @text: a text with one or many words/sentences
+# divides the text into sentences and calculates sentiment of each of them
+# returns the average of all the sentiments
+GetSentiment <- function(text){
+    
+    sentiments <- text %>% 
+        get_sentences() %>% 
+        sentiment() 
+    
+    sentiment <- sentiments$sentiment %>% 
+        mean()
+    
+    return (sentiment)
+}
+
+
+
+# input: a date in character format or date format
+# if the date is before 2018, returns false, else returns true
+JoinedRecently <- function(date){
+    if_else(date >= as.Date("2018-01-01"), 1, 0)
+}
+
+
+
+
+# input: @x: a character vector
+# returns the string with stopwords removed
+RemoveStopwords <- function(x){
+    try_corpus <- Corpus(VectorSource(x)) %>% 
+        tm_map(content_transformer(tolower)) %>% 
+        tm_map(removeWords, stopwords("en"))
+    return(try_corpus$content)
+}
+
+
+# input: @text: a string
+# returns the sentiment of the text
+GetSentiment <- function(text){
+    sentiments <- text %>% 
+        get_sentences() %>% 
+        sentiment() 
+    
+    sentiment <- sentiments$sentiment %>% 
+        mean()
+    
+    return(sentiment)
+}
+
+
+
+
+# input: @post_id: id of a post 
+# returns the average sentiment of the comments of the post
+SentimentOfComments <- function(post_id){
+    all_comments <- filter(comments_of_posts, PostId == post_id)
+    avg_sentiment <- all_comments$Sentiment %>% 
+        mean()
+    print(paste('Avg sentiment of post ', post_id, ': ', avg_sentiment))
+    return (avg_sentiment)
+}
