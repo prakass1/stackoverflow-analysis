@@ -19,6 +19,31 @@ tags_summary <- questions_one_tag %>%
 
 
 
+q <- questions_one_tag
+q <- sample_n(q, 2000)
+comments_of_posts <- filter(comments, PostId %in% q$Id)
+comments_of_posts <- comments_of_posts %>% 
+    rowwise() %>% 
+    mutate(Sentiment = GetSentiment(Text))
+
+# create a Sentiment column for comments
+comments_of_posts["Sentiment"] <- apply(comments_of_posts["Text"], 1, GetSentiment)
+
+# create a SentimentOfComments column for each post
+q["SentimentOfComments"] <- apply(q["Id"], 1, SentimentOfComments)
+
+# group by tags and aggregate by mean of SentimentOfComments
+tags_summary <- q %>%
+    group_by(Tags) %>%
+    summarise(AverageSentiment = mean(SentimentOfComments, na.rm = TRUE))
+
+ggplot(tags_summary, aes(x = Tags, y = AverageSentiment, fill = Tags)) +
+    geom_bar(stat="identity") + 
+    coord_polar() +
+    theme_bw() +
+    labs(x = "Tags", y = "Average Sentiment", title = "Average Sentiment towards Tags")
+
+
 # Plot answer_counts aggregated with Tags
 angle <- theme(axis.text.x = element_text(angle=60))
 pdf(file="plots_questions.pdf",paper = "a4" )
