@@ -8,6 +8,7 @@ library("stringr")
 library("lubridate")
 library("rvest")
 library("corrplot")
+library("magrittr")
 
 
 
@@ -71,6 +72,9 @@ questions <- questions %>%
 # same as above
 answers <- answers %>%
     transform(CreationDate = as.Date(CreationDate, tryFormats = c("%Y%m%d")))
+# same as above
+comments <- comments %>%
+    mutate(CreationDate = as.Date(CreationDate, tryFormats = c("%Y%m%d"))) 
 
 
 # make all NA cols to 0 for not having any NULLS
@@ -89,43 +93,20 @@ questions <- questions %>%
     filter(Tags != "")
 
 
-
-# extract links from questions and answers body and place them in new columns 
-questions$Links <- lapply(questions$Body, GetLinks)
-answers$Links <- lapply(answers$Body, GetLinks)
-
-# extract code from questions and answers body and place them in new columns 
-questions$Code <- lapply(questions$Body, GetCode)
-answers$Code <- lapply(answers$Body, GetCode)
-
-# create a new column HasLinks, which contains 1 if the post body contains links, 0 otherwise
+# extract links and code from questions and answers body and place them in new columns 
+# then extract the <p> tags from the Body column and replace the column with the 
+# contents inside the <p> tags. This removes the links and code, and keeps only the text
 questions <- questions %>% 
-    mutate(HasLinks = if_else(Links != "", 1, 0))
-answers <- answers %>% 
-    mutate(HasLinks = if_else(Links != "", 1, 0))
-
-# create a new column HasCode, which contains 1 if the post body contains code, 0 otherwise
-questions <- questions %>% 
-    mutate(HasCode = if_else(Code != "", 1, 0))
-answers <- answers %>% 
-    mutate(HasCode = if_else(Code != "", 1, 0))
-
-# this code extracts the <p> tags from the Body column and replaces
-# the column with the contents inside the <p> tags. This removes the
-# links and code, and keeps only the text
-questions$Body <- lapply(questions$Body, function(x){
-    body <- read_html(x) %>% 
-        html_nodes("p") %>% 
-        html_text()
-    return (paste(body, collapse=","))
-})
+    rowwise() %>% 
+    mutate(Links = GetLinks(Body), Code = GetCode(Body)) %>% 
+    mutate(Body = GetParagraphContents(Body)) %>% 
+    mutate(HasLinks = if_else(Links != "", 1, 0), HasCode = if_else(Code != "", 1, 0))
 # same as above
-answers$Body <- lapply(answers$Body, function(x){
-    body <- read_html(x) %>% 
-        html_nodes("p") %>% 
-        html_text()
-    return (paste(body, collapse=","))
-})
+answers <- answers %>% 
+    rowwise() %>% 
+    mutate(Links = GetLinks(Body), Code = GetCode(Body)) %>% 
+    mutate(Body = GetParagraphContents(Body)) %>% 
+    mutate(HasLinks = if_else(Links != "", 1, 0), HasCode = if_else(Code != "", 1, 0))
 
 
 
@@ -169,7 +150,72 @@ comments <- comments %>%
 comments <- comments %>% 
     mutate(CreationDate = as.Date(CreationDate, tryformats=c("Y%m%d")))
 
+
 #############################################
 
 
 
+
+
+
+
+############ Preprocess Users ############
+
+
+users_cols <- c("Id",
+                "Reputation",
+                "CreationDate",
+                "DisplayName",
+                "LastAccessDate",
+                "WebsiteUrl",
+                "Location",
+                "AboutMe",
+                "Views",
+                "UpVotes",
+                "DownVotes",
+                "AccountId")
+                    
+
+# keep only selective columns
+users <- users %>% 
+    select(users_cols)
+
+
+# filter the users that are in posts and comments
+user_ids <- append(questions$OwnerUserId, answers$OwnerUserId, comments$UserId)
+users <- users %>% 
+    filter(AccountId %in% user_ids)
+
+
+# keep only the date part in the LastAccessDate and CreationDate columns
+# then create a new column called Score which is just upvotes minus downvotes
+# the last select removes the UpVotes and DownVotes columns
+users <- users %>% 
+    mutate(LastAccessDate = as.Date(LastAccessDate, tryformats=c("Y%m%d"))) %>% 
+    mutate(CreationDate = as.Date(CreationDate, tryformats=c("Y%m%d"))) %>% 
+    mutate(Score = UpVotes - DownVotes) %>% 
+    select(-c(UpVotes, DownVotes))
+    
+
+
+
+
+
+# extract Links and Code from the AboutMe column and put them in separate columns
+# remove the <p> tags and Links and Code from AboutMe
+# create a new column called JoinedRecently, which stores 1 if the user joined in 2018,
+# 0 if they joined earlier
+users <- users %>% 
+    rowwise() %>% 
+    mutate(Links = GetLinks(AboutMe), Code = GetCode(AboutMe)) %>% 
+    mutate(AboutMe = GetParagraphContents(AboutMe)) %>% 
+    mutate(JoinedRecently = JoinedRecently(CreationDate))
+
+# create 2 new columns HasCode and HasLinks, which store 1 if the AboutMe 
+# has code/links and 0 if not
+users <- users %>%
+    mutate(HasLinks = if_else(Links != "", 1, 0), HasCode = if_else(Code != "", 1, 0))
+
+
+
+#############################################
