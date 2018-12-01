@@ -11,11 +11,11 @@ questions_one_tag <- questions_one_tag %>% filter(Tags != "")
 # questions grouped by total answer count, comment count, and sum of scores of tags
 tags_summary <- questions_one_tag %>%
     group_by(Tags) %>%
-    summarise(sum_answer_count = sum(AnswerCount),
-              sum_comment_count = sum(CommentCount),
-              sum_score = sum(Score)) %>%
+    summarise(mean_answer = mean(AnswerCount),
+              mean_comment = mean(CommentCount),
+              mean_score = mean(Score)) %>%
     #top_n(5,avg_answer_count) %>%
-    select(Tags, sum_answer_count, sum_comment_count, sum_score)
+    select(Tags, mean_answer, mean_comment, mean_score)
 
 
 
@@ -52,15 +52,15 @@ ggplot(questions_one_tag, aes(x=Tags,fill=Tags)) +
     geom_bar(stat = "count") + 
     ggtitle("Frequency of Tags") + 
     angle
-ggplot(tags_summary, aes(x=Tags,y=sum_answer_count,fill=sum_answer_count)) +
+ggplot(tags_summary, aes(x=Tags,y=mean_answer,fill=mean_answer)) +
     geom_bar(stat = "identity") +
     ggtitle("Tag Distribution on Answers") +
     angle
-ggplot(tags_summary, aes(x=Tags,y=sum_comment_count,fill=sum_comment_count)) + 
+ggplot(tags_summary, aes(x=Tags,y=mean_comment,fill=mean_comment)) + 
     geom_bar(stat = "identity") + 
     ggtitle("Tag Distribution on Comment") +
     angle
-ggplot(tags_summary, aes(x=Tags,y=sum_score,fill=sum_score)) + 
+ggplot(tags_summary, aes(x=Tags,y=mean_score,fill=mean_score)) + 
     geom_bar(stat = "identity") + 
     ggtitle("Tag Distribution on Score") +
     angle
@@ -68,3 +68,32 @@ ggplot(tags_summary, aes(x=Tags,y=sum_score,fill=sum_score)) +
 dev.off()
 graphics.off()
 
+####### Pie Chart a Distribution#############
+Tags_freq <- count(questions,Tags)
+
+calcPercFreq <- function(x){
+  return((x/nrow(questions)) * 100)
+}
+
+Tags_freq['n'] <- apply(Tags_freq['n'],1,calcPercFreq)
+
+library("plotly")
+p <- plot_ly(Tags_freq, labels = ~Tags, values = ~n, type = 'pie') %>%
+  layout(title = 'Percentage of Tag Distribution in the Dataset',
+         xaxis = list(showgrid = FALSE, zeroline = FALSE, showticklabels = FALSE),
+         yaxis = list(showgrid = FALSE, zeroline = FALSE, showticklabels = FALSE))
+p
+
+######## Percentage of 15 tags across months in our dataset #####
+
+tagPMonthlySum <- questions %>% 
+  group_by(month = substr(CreationDate,1,7)) %>% 
+  count(Tags) %>% summarise(sumTags = sum(n))
+
+tagPMonthly <- questions %>% 
+  group_by(month = substr(CreationDate,1,7)) %>% 
+  count(Tags) %>%
+  mutate(percN = (n/sum(n))*100)
+
+ggplot(tagPMonthly, aes(x = month, y = percN,fill=Tags)) + 
+  geom_bar(stat = "identity",position = "stack") + facet_grid(~ Tags) + theme(axis.text.x = element_text(angle=45))

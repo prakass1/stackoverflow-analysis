@@ -1,8 +1,8 @@
 # SO_config.R
 # StackOverflow Configurations
 
-xml_loc <- "data/"
-csv_loc <- "data/"
+csv_loc <- "F:/csv_location/"
+xml_loc <- "F:/xml_locations/"
 
 ### For Other OS ############
 # xml_loc <- "/data/"

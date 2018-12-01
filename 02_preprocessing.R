@@ -9,7 +9,7 @@ library("lubridate")
 library("rvest")
 library("corrplot")
 library("magrittr")
-
+library("dplyr")
 
 
 
@@ -74,7 +74,7 @@ answers <- answers %>%
     transform(CreationDate = as.Date(CreationDate, tryFormats = c("%Y%m%d")))
 # same as above
 comments <- comments %>%
-    mutate(CreationDate = as.Date(CreationDate, tryFormats = c("%Y%m%d"))) 
+    transform(CreationDate = as.Date(CreationDate, tryFormats = c("%Y%m%d"))) 
 
 
 # make all NA cols to 0 for not having any NULLS
@@ -148,7 +148,7 @@ comments <- comments %>%
 
 # remove the time part of the CreationDate column as time is not meaningful
 comments <- comments %>% 
-    mutate(CreationDate = as.Date(CreationDate, tryformats=c("Y%m%d")))
+        transform(CreationDate = as.Date(CreationDate, tryformats=c("Y%m%d")))
 
 
 #############################################
@@ -215,7 +215,5 @@ users <- users %>%
 # has code/links and 0 if not
 users <- users %>%
     mutate(HasLinks = if_else(Links != "", 1, 0), HasCode = if_else(Code != "", 1, 0))
-
-
 
 #############################################
