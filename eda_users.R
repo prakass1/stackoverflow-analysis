@@ -1,18 +1,13 @@
-library("tm")
-library("tidytext")
-library("sentimentr")
-library("wordcloud")
+#eda_tags.R
 
-n <- 1000
-u <- sample_n(users, n)
-c <- sample_n(comments, n)
-q <- sample_n(questions, n)
 
-# convert nas to empty strings
-users[is.na(users)] <- ""
 
-u <- users
-users <- users[1:1000,]
+# clean users AboutMe
+users["TidyBody"] <- users$AboutMe %>% 
+    RemoveStopwords() %>% 
+    CleanText()
+
+
 # create a column that stores the sentiment score for a user in their AboutMe
 users <- users %>%
     rowwise() %>% 
@@ -22,25 +17,35 @@ users <- users %>%
 # overall sentiment of users AboutMe
 ggplot(users, aes(x = Sentiment)) +
     geom_density(fill = "steelblue") +
-    scale_x_log10() 
+    scale_x_log10() +
+    scale_alpha_discrete(range = c(0,1))
     
 
 
 
-# remove the stopwords in the user AboutMe and convert all text to lower case
-users["TidyBody"] <- RemoveStopwords(users$AboutMe)
 
 # create a list of words with their frequencies
 words <- users %>% 
     select("TidyBody") %>% 
     unnest_tokens(word, TidyBody) %>% 
     group_by(word) %>% 
-    summarise(count = n())
+    summarise(count = n()) %>% 
+    arrange(desc(count))
+
+words <- Corpus(VectorSource(users$TidyBody))
+dtm <- TermDocumentMatrix(words)
+m <- as.matrix(dtm)
+
+# remove some terms
+words <- words %>% 
+    filter( !(word %in% c("li", "http", "https", "s", "com", "www", "h")))
 
 # create a wordcloud by passing in each word with its frequency to wordcloud()
-pal <- brewer.pal(9,"Set2")
-wordcloud(words$word , words$count, 
-          scale=c(2.5, 0.5), max.words=70, colors = pal)
+pal <- brewer.pal(8,"Dark2")
+wordcloud(words = words$word , freq = words$count,
+          min.freq = 1, max.words=150,
+          scale=c(3, 0.7), colors = pal)
+
 
 
 
@@ -54,7 +59,51 @@ ggplot(genders, aes(x = factor(1), fill = factor(gender))) +
     coord_polar(theta = "y") +
     labs(x = "", y = "", title = "Gender Distribution") +
     scale_fill_discrete(name = "") +
-    theme_bw()
+    theme_bw() +
+    scale_fill_manual(values=c("green", "yellow")) 
 
 
 
+
+
+#################################### Locations #################################### 
+
+
+# get a sorted dataframe of user locations
+locations <- users %>%
+    filter(Location != "") %>% 
+    count(Location, sort = TRUE) %>%
+    ungroup()
+
+
+
+#locations_top100 <- locations[1:5, ]
+#c <- apply(locations_top100, 1, GetCoordinates)
+#locations_top100['Coordinates'] <- apply(locations_top100, 1, GetCoordinates)
+
+locations1 <- locations[1:2500,]
+locations2 <- locations[2501:4130,]
+
+coordinates1 <- geocode(locations1$Location, source="dsk")
+coordinates2 <- geocode(locations2$Location, source="dsk")
+
+# plotting locations on the map
+map <- df %>%  
+    leaflet() %>%
+    addTiles() %>%  # Add default OpenStreetMap map tiles
+    # add a cluster option to the markers
+    addCircleMarkers(
+        clusterOptions = markerClusterOptions()
+    )
+map  # Print the map
+
+
+lat <- rep(df$lat, times=)
+
+
+
+# tags by location
+q <- questions_one_tag %>% 
+    select(OwnerUserId, Tags)
+
+q["Location"] <- GetLocation(q$OwnerUserId)
