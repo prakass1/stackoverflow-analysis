@@ -1,15 +1,7 @@
 # 02_preprocessing.R
 # data cleaning and preprocessing
 
-library("stringr")
-library("gsubfn")
-library("ggplot2")
-library("stringr")
-library("lubridate")
-library("rvest")
-library("corrplot")
-library("magrittr")
-library("dplyr")
+
 
 
 
@@ -72,9 +64,6 @@ questions <- questions %>%
 # same as above
 answers <- answers %>%
     transform(CreationDate = as.Date(CreationDate, tryFormats = c("%Y%m%d")))
-# same as above
-comments <- comments %>%
-    transform(CreationDate = as.Date(CreationDate, tryFormats = c("%Y%m%d"))) 
 
 
 # make all NA cols to 0 for not having any NULLS
@@ -148,7 +137,16 @@ comments <- comments %>%
 
 # remove the time part of the CreationDate column as time is not meaningful
 comments <- comments %>% 
-        transform(CreationDate = as.Date(CreationDate, tryformats=c("Y%m%d")))
+    mutate(CreationDate = as.Date(CreationDate, tryformats=c("Y%m%d")))
+
+
+#comments <- comments %>% 
+#    rowwise() %>% 
+#    mutate(Links = GetLinks(Body), Code = GetCode(Body)) %>% 
+#    mutate(Body = GetParagraphContents(Body)) %>% 
+#    mutate(HasLinks = if_else(Links != "", 1, 0), HasCode = if_else(Code != "", 1, 0))
+
+
 
 
 #############################################
@@ -160,6 +158,9 @@ comments <- comments %>%
 
 
 ############ Preprocess Users ############
+
+# 1. remove the users who haven't recently posted a question, answer, or comment
+# 2. add a new column JoinedRecently
 
 
 users_cols <- c("Id",
@@ -181,8 +182,12 @@ users <- users %>%
     select(users_cols)
 
 
-# filter the users that are in posts and comments
-user_ids <- append(questions$OwnerUserId, answers$OwnerUserId, comments$UserId)
+# filter the users that are in posts and comments (recently active)
+user_ids <- append(questions$OwnerUserId, answers$OwnerUserId) %>% 
+    append(comments$UserId) %>% 
+    unique()
+
+# keep only the recently active users
 users <- users %>% 
     filter(AccountId %in% user_ids)
 
@@ -194,6 +199,7 @@ users <- users %>%
     mutate(LastAccessDate = as.Date(LastAccessDate, tryformats=c("Y%m%d"))) %>% 
     mutate(CreationDate = as.Date(CreationDate, tryformats=c("Y%m%d"))) %>% 
     mutate(Score = UpVotes - DownVotes) %>% 
+    mutate(JoinedRecently = JoinedRecently(CreationDate)) %>% 
     select(-c(UpVotes, DownVotes))
     
 
@@ -201,19 +207,21 @@ users <- users %>%
 
 
 
-# extract Links and Code from the AboutMe column and put them in separate columns
+# extract Links and Code from the AboutMe column (after converting to lower case) 
+# and put them in separate columns
 # remove the <p> tags and Links and Code from AboutMe
 # create a new column called JoinedRecently, which stores 1 if the user joined in 2018,
 # 0 if they joined earlier
 users <- users %>% 
     rowwise() %>% 
+    mutate(AboutMe = tolower(AboutMe)) %>% 
     mutate(Links = GetLinks(AboutMe), Code = GetCode(AboutMe)) %>% 
     mutate(AboutMe = GetParagraphContents(AboutMe)) %>% 
-    mutate(JoinedRecently = JoinedRecently(CreationDate))
-
-# create 2 new columns HasCode and HasLinks, which store 1 if the AboutMe 
-# has code/links and 0 if not
-users <- users %>%
     mutate(HasLinks = if_else(Links != "", 1, 0), HasCode = if_else(Code != "", 1, 0))
+
+# make all NA cols to 0 for not having any NULLS
+users[is.na(users)] <- ""
+
+
 
 #############################################

@@ -1,7 +1,5 @@
 # eda_posts_and_comments
 
-library("corrplot")
-
 
 score_questions <- questions %>%
     arrange(desc(Score)) %>%
