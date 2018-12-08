@@ -1,8 +1,6 @@
 # util.R
 # contains utility functions used by other files
 
-library("dplyr")
-library("XML")
 
 # input: @filepath: the path with extension of the xml to read, @query: xpath query to select nodes
 # returns a dataframw with the parsed xml contents
@@ -128,23 +126,6 @@ GetParagraphContents <- function (x) {
 
 
 
-# input: @text: a text with one or many words/sentences
-# divides the text into sentences and calculates sentiment of each of them
-# returns the average of all the sentiments
-GetSentiment <- function(text){
-    
-    sentiments <- text %>% 
-        get_sentences() %>% 
-        sentiment() 
-    
-    sentiment <- sentiments$sentiment %>% 
-        mean()
-    
-    return (sentiment)
-}
-
-
-
 # input: a date in character format or date format
 # if the date is before 2018, returns false, else returns true
 JoinedRecently <- function(date){
@@ -154,8 +135,51 @@ JoinedRecently <- function(date){
 
 
 
+# input: @text: a string
+# returns the sentiment of the text
+GetSentiment <- function(text){
+    # divides the text into separate words
+    tokens <- data_frame(text = text) %>% 
+        unnest_tokens(word, text)
+    
+    # gets sentiment score of words and sums the scores to get overall sentiment
+    sentiment <- tokens %>%
+        inner_join(get_sentiments("afinn")) %>% 
+        summarise(sentiment = sum(score)) %>% 
+        pull(sentiment)
+    
+    return (sentiment)
+}
+
+
+
+
+
+
+# input: @comments dataframe, @post_id: id of a post 
+# returns the average sentiment of the comments of the post
+SentimentOfComments <- function(comments, post_id){
+    all_comments <- filter(comments, PostId == post_id)
+    avg_sentiment <- all_comments$Sentiment %>% 
+        mean()
+    print(paste('Avg sentiment of post ', post_id, ': ', avg_sentiment))
+    return (avg_sentiment)
+}
+
+
+
+# input: @text: a character vector
+# removes numbers and punctuation, and then stems and lemmatizes the text
+CleanText <- function(text){
+    text <- gsub("([0-9]+|[[:punct:]]+)", " ", text) %>% 
+        wordStem(language = "english") %>% 
+        lemmatize_strings()
+    text <- gsub("\\s+", " ", text)
+    return (text)
+}
+
 # input: @x: a character vector
-# returns the string with stopwords removed
+# returns the text with stopwords removed
 RemoveStopwords <- function(x){
     try_corpus <- Corpus(VectorSource(x)) %>% 
         tm_map(content_transformer(tolower)) %>% 
@@ -164,28 +188,30 @@ RemoveStopwords <- function(x){
 }
 
 
-# input: @text: a string
-# returns the sentiment of the text
-GetSentiment <- function(text){
-    sentiments <- text %>% 
-        get_sentences() %>% 
-        sentiment() 
-    
-    sentiment <- sentiments$sentiment %>% 
-        mean()
-    
-    return(sentiment)
+
+
+# input: @df: a dataframe
+# returns a Document Term Matrix (to return a Term Document Matrix, change the function name to TermDocumentMatrix)
+DocumentTermMatrix <- function(df){
+    #corpus <- Corpus (VectorSource(df$TidyBody)) 
+    corpus <- Corpus (VectorSource(df)) 
+    tdmcorpus <- DocumentTermMatrix(corpus)
+    return(tdmcorpus)
 }
 
 
 
 
-# input: @post_id: id of a post 
-# returns the average sentiment of the comments of the post
-SentimentOfComments <- function(post_id){
-    all_comments <- filter(comments_of_posts, PostId == post_id)
-    avg_sentiment <- all_comments$Sentiment %>% 
-        mean()
-    print(paste('Avg sentiment of post ', post_id, ': ', avg_sentiment))
-    return (avg_sentiment)
+#######################################
+
+
+
+
+GetLocation <- function(id){
+    location <- users %>% 
+        filter(Id == id) %>% 
+        select(Location)
+    return (location)
 }
+
+
