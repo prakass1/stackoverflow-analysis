@@ -1,6 +1,7 @@
 #eda_tags.R
 
 
+
 # apply the filterOneTag function on the Tags column of questions
 # this will make the Tags column have only one tag
 questions_one_tag <- questions
@@ -11,37 +12,60 @@ questions_one_tag <- questions_one_tag %>% filter(Tags != "")
 # questions grouped by total answer count, comment count, and sum of scores of tags
 tags_summary <- questions_one_tag %>%
     group_by(Tags) %>%
-    summarise(mean_answer = mean(AnswerCount),
-              mean_comment = mean(CommentCount),
-              mean_score = mean(Score)) %>%
-    #top_n(5,avg_answer_count) %>%
-    select(Tags, mean_answer, mean_comment, mean_score)
+    summarise(sum_answer_count = sum(AnswerCount),
+              sum_comment_count = sum(CommentCount),
+              sum_score = sum(Score),
+              count = n()) %>% 
+    mutate(avg_score = sum_score/count) %>% 
+    select(Tags, sum_answer_count, sum_comment_count, sum_score, count, avg_score)
 
 
 
-q <- questions_one_tag
-q <- sample_n(q, 2000)
-comments_of_posts <- filter(comments, PostId %in% q$Id)
-comments_of_posts <- comments_of_posts %>% 
+
+
+# random sample questions and filter comments that are in the sample
+questions_sample <- sample_n(questions_one_tag, 10000)
+
+# create a TidyText column for comments that contains preprocessed text
+comments <- comments %>% 
     rowwise() %>% 
-    mutate(Sentiment = GetSentiment(Text))
+    mutate(TidyBody = CleanText(Text))
 
-# create a Sentiment column for comments
-comments_of_posts["Sentiment"] <- apply(comments_of_posts["Text"], 1, GetSentiment)
+# same as above for questions
+questions_sample <- questions_sample %>% 
+    rowwise() %>% 
+    mutate(TidyBody = RemoveStopwords(Body)) %>% 
+    mutate(TidyBody = CleanText(TidyBody))
+
+    
+
+
+# get only the comments that are in the posts sample
+# then clean the text into a new TidyBody column and also create a Sentiment column
+comments_of_posts <- comments %>% 
+    filter(PostId %in% questions_sample$Id)
+    rowwise() %>% 
+    mutate(TidyBody = CleanText(Text)) %>% 
+    mutate(Sentiment = GetSentiment(TidyText))
+
+
 
 # create a SentimentOfComments column for each post
-q["SentimentOfComments"] <- apply(q["Id"], 1, SentimentOfComments)
+questions_sample["SentimentOfComments"] <- apply(c(comments_of_posts, questions_sample["Id"]), 1, SentimentOfComments)
 
 # group by tags and aggregate by mean of SentimentOfComments
-tags_summary <- q %>%
+tags_summary <- questions_sample %>%
     group_by(Tags) %>%
     summarise(AverageSentiment = mean(SentimentOfComments, na.rm = TRUE))
 
+# avg sentiment of comments grouped by tag
 ggplot(tags_summary, aes(x = Tags, y = AverageSentiment, fill = Tags)) +
     geom_bar(stat="identity") + 
     coord_polar() +
     theme_bw() +
     labs(x = "Tags", y = "Average Sentiment", title = "Average Sentiment towards Tags")
+
+
 
 
 # Plot answer_counts aggregated with Tags
@@ -52,15 +76,15 @@ ggplot(questions_one_tag, aes(x=Tags,fill=Tags)) +
     geom_bar(stat = "count") + 
     ggtitle("Frequency of Tags") + 
     angle
-ggplot(tags_summary, aes(x=Tags,y=mean_answer,fill=mean_answer)) +
+ggplot(tags_summary, aes(x=Tags,y=sum_answer_count,fill=sum_answer_count)) +
     geom_bar(stat = "identity") +
     ggtitle("Tag Distribution on Answers") +
     angle
-ggplot(tags_summary, aes(x=Tags,y=mean_comment,fill=mean_comment)) + 
+ggplot(tags_summary, aes(x=Tags,y=sum_comment_count,fill=sum_comment_count)) + 
     geom_bar(stat = "identity") + 
     ggtitle("Tag Distribution on Comment") +
     angle
-ggplot(tags_summary, aes(x=Tags,y=mean_score,fill=mean_score)) + 
+ggplot(tags_summary, aes(x=Tags,y=sum_score,fill=sum_score)) + 
     geom_bar(stat = "identity") + 
     ggtitle("Tag Distribution on Score") +
     angle
@@ -68,32 +92,24 @@ ggplot(tags_summary, aes(x=Tags,y=mean_score,fill=mean_score)) +
 dev.off()
 graphics.off()
 
-####### Pie Chart a Distribution#############
-Tags_freq <- count(questions,Tags)
 
-calcPercFreq <- function(x){
-  return((x/nrow(questions)) * 100)
-}
 
-Tags_freq['n'] <- apply(Tags_freq['n'],1,calcPercFreq)
 
-library("plotly")
-p <- plot_ly(Tags_freq, labels = ~Tags, values = ~n, type = 'pie') %>%
-  layout(title = 'Percentage of Tag Distribution in the Dataset',
-         xaxis = list(showgrid = FALSE, zeroline = FALSE, showticklabels = FALSE),
-         yaxis = list(showgrid = FALSE, zeroline = FALSE, showticklabels = FALSE))
-p
+# average score grouped by tags
+ggplot(tags_summary, aes(x=Tags,y=avg_score,fill=avg_score)) + 
+    geom_bar(stat = "identity") + 
+    labs(x="Tags", y="Average Score", title="Average Score By Tag")
 
-######## Percentage of 15 tags across months in our dataset #####
 
-tagPMonthlySum <- questions %>% 
-  group_by(month = substr(CreationDate,1,7)) %>% 
-  count(Tags) %>% summarise(sumTags = sum(n))
 
-tagPMonthly <- questions %>% 
-  group_by(month = substr(CreationDate,1,7)) %>% 
-  count(Tags) %>%
-  mutate(percN = (n/sum(n))*100)
+avg_score_all <- tags_summary %>% 
+    pull(avg_score) %>% 
+    mean()
 
-ggplot(tagPMonthly, aes(x = month, y = percN,fill=Tags)) + 
-  geom_bar(stat = "identity",position = "stack") + facet_grid(~ Tags) + theme(axis.text.x = element_text(angle=45))
+ks <- ks.test(x = avg_score, y = rep(avg_score_all, times=nrow(tags_summary)))
+
+
+
+
+
+
