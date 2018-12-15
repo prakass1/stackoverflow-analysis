@@ -1,3 +1,7 @@
+
+
+
+
 # 02_preprocessing.R
 # data cleaning and preprocessing
 
@@ -98,7 +102,7 @@ answers <- answers %>%
     mutate(HasLinks = if_else(Links != "", 1, 0), HasCode = if_else(Code != "", 1, 0))
 
 
-
+questions["Tags"] <- apply(questions["Tags"],1,filterOneTag)
 #############################################
 
 
@@ -177,46 +181,46 @@ users_cols <- c("Id",
                 "AccountId")
                     
 
-# keep only selective columns
-users <- users %>% 
+keep only selective columns
+users <- users %>%
     select(users_cols)
 
 
 # filter the users that are in posts and comments (recently active)
-user_ids <- append(questions$OwnerUserId, answers$OwnerUserId) %>% 
-    append(comments$UserId) %>% 
+user_ids <- append(questions$OwnerUserId, answers$OwnerUserId) %>%
+    append(comments$UserId) %>%
     unique()
 
 # keep only the recently active users
-users <- users %>% 
+users <- users %>%
     filter(AccountId %in% user_ids)
 
 
 # keep only the date part in the LastAccessDate and CreationDate columns
 # then create a new column called Score which is just upvotes minus downvotes
 # the last select removes the UpVotes and DownVotes columns
-users <- users %>% 
-    mutate(LastAccessDate = as.Date(LastAccessDate, tryformats=c("Y%m%d"))) %>% 
-    mutate(CreationDate = as.Date(CreationDate, tryformats=c("Y%m%d"))) %>% 
-    mutate(Score = UpVotes - DownVotes) %>% 
-    mutate(JoinedRecently = JoinedRecently(CreationDate)) %>% 
+users <- users %>%
+    mutate(LastAccessDate = as.Date(LastAccessDate, tryformats=c("Y%m%d"))) %>%
+    mutate(CreationDate = as.Date(CreationDate, tryformats=c("Y%m%d"))) %>%
+    mutate(Score = UpVotes - DownVotes) %>%
+    mutate(JoinedRecently = JoinedRecently(CreationDate)) %>%
     select(-c(UpVotes, DownVotes))
-    
 
 
 
 
 
-# extract Links and Code from the AboutMe column (after converting to lower case) 
+
+# extract Links and Code from the AboutMe column (after converting to lower case)
 # and put them in separate columns
 # remove the <p> tags and Links and Code from AboutMe
 # create a new column called JoinedRecently, which stores 1 if the user joined in 2018,
 # 0 if they joined earlier
-users <- users %>% 
-    rowwise() %>% 
-    mutate(AboutMe = tolower(AboutMe)) %>% 
-    mutate(Links = GetLinks(AboutMe), Code = GetCode(AboutMe)) %>% 
-    mutate(AboutMe = GetParagraphContents(AboutMe)) %>% 
+users <- users %>%
+    rowwise() %>%
+    mutate(AboutMe = tolower(AboutMe)) %>%
+    mutate(Links = GetLinks(AboutMe), Code = GetCode(AboutMe)) %>%
+    mutate(AboutMe = GetParagraphContents(AboutMe)) %>%
     mutate(HasLinks = if_else(Links != "", 1, 0), HasCode = if_else(Code != "", 1, 0))
 
 # make all NA cols to 0 for not having any NULLS
