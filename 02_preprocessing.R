@@ -181,7 +181,7 @@ users_cols <- c("Id",
                 "AccountId")
                     
 
-keep only selective columns
+# keep only selective columns
 users <- users %>%
     select(users_cols)
 
