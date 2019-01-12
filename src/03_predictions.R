@@ -1,146 +1,143 @@
-# library(text2vec)
-# library(data.table)
-# library(caret)
-# library(tm)
-# library(quanteda)
-# samples_q <- questions[sample(nrow(questions), 80000), ]
-# 
-# set.seed(100)
-# trainNum <- createDataPartition(as.factor(samples_q$Tags),p = .75,list=F)
-# train <- samples_q[trainNum,]
-# test <- samples_q[-trainNum,]
-# 
-# (unique(samples_q$Tags))
-# 
-# dfmGen <- function(samples){
-#   toks <- tokens_remove(tokens(samples$Title, 
-#                                remove_punct = TRUE),stopwords("english"))
-#   ngram <- tokens_ngrams(toks, n = 2)
-#   my_dfm <- dfm(ngram, stem = FALSE)
-#   topfeatures(my_dfm, 20)  # 20 top words
-#   my_dfm1<- dfm_trim(my_dfm, min_termfreq = 100,min_docfreq = 120)
-#   set.seed(100)
-#   textplot_wordcloud(my_dfm1, min_count = 6, random_order = FALSE,
-#                      rotation = .25, 
-#                      color = RColorBrewer::brewer.pal(8,"Dark2"))
-#   #return(my_dfm1)
-# 
-#     return(convert(my_dfm1,to = "data.frame"))
-# }
-
-
+library(caret)
 library(dplyr)
 library(tidytext)
 
-#samples_q <- questions[sample(nrow(questions), 80000), ]
-trainNum <- createDataPartition(as.factor(questions$Tags),p = .75,list=F)
 
-samples_q <- questions[trainNum,]
-samples_q_test <- questions[-trainNum,]
-
-perfComputationForLDA <- function(samples_q){
+## Method performs initial operations to process text data apply tf-idf and fetch top 50 terms
+# and create a document Term Matrix
+perfComputationForLDA <- function(data){
   
-  posts_words <- samples_q %>%
+  #Unest Tokens by making them to lower, removing numeric and punctuations
+  posts_words <- data %>%
     unnest_tokens(to_lower = T, strip_numeric=T,strip_punct=T,word, Title) %>%
     count(Tags, word, sort = TRUE) %>%
     ungroup()
   
-  
+  #Total Words
   total_words <- posts_words %>% 
     group_by(Tags) %>% 
     summarize(total = sum(n))
   
+  #Apply a Left join to retain posts and total words for the post
   tag_words <- left_join(posts_words, total_words)
   
-  tag_words
-  library(ggplot2)
+
   
-  #Number of words 'n' occuring in total tags distribution plot #########
-  ggplot(tag_words, aes(n/total, fill = Tags)) +
-    geom_histogram(show.legend = FALSE) +
-    xlim(NA, 0.0009) +
-    facet_wrap(~Tags, ncol = 2, scales = "free_y")
+  ###### Applying a custom stopword technique and then apply tfidf #########
+  mystopwords = data.frame(word = c("5.7","5.6","2.7","1064","3.6","using",
+                                    "i", "me", "my", "myself", "we", 
+                                    "our", "ours", "ourselves", "you", "your", "yours", 
+                                    "yourself", "yourselves", "he", "him", 
+                                    "his", "himself", "she", 
+                                    "her", "hers", "herself", "it", "its", "itself", "they", "them", "their", 
+                                    "theirs", "themselves", "what", 
+                                    "which", "who", "whom", "this", "that", "these",
+                                    "those", "am", "is", "are", "was", "were", "be", 
+                                    "been", "being", "have", "has", "had", "having",
+                                    "do", "does", "did", 
+                                    "doing", "a", "an", "the", "and", "but", "if", "or", 
+                                    "because", "as", "until", "while", "of", "at", "by", "for", 
+                                    "with", "about", "against", "between", "into", 
+                                    "through", "during", "before", "after", "above", "below", 
+                                    "to", "from", "up", "down", "in", "out", "on",
+                                    "off", "over", "under", "again", "further", "then", "once", "here", 
+                                    "there", "when", "where", "why", "how", "all", 
+                                    "any", "both", "each", "few", "more", 
+                                    "most", "other", "some", "such", "no", "nor", "not", "only", "own", "same", 
+                                    "so", "than", "too", "very", "s", "t", 
+                                    "can", "will", "just", "don", "should", "now"))
   
-  
-  ####Zip's frequency is inversly proportional to rank
-  freq_by_rank <- tag_words %>% 
-    group_by(Tags) %>% 
-    mutate(rank = row_number(), 
-           `term_frequency` = n/total)
-  
-  
-  #####Plot Zip's Law showing inverse proportion relationship #########
-  ggplot(data = freq_by_rank,aes(x=rank,y=term_frequency,color=Tags)) + 
-    geom_line(size = 0.4, alpha = 0.8, show.legend = T) + scale_x_log10() + scale_y_log10()
-  
-  
-  ###### Apply stopwords and then apply tfidf #########
-  mystopwords = data.frame(word = c("5.7","5.6","2.7","1064","3.6"))
+  #antijoin() to remove stopwords
   tag_words <- anti_join(tag_words, mystopwords, by = "word")
   
- # tag_words <- anti_join(tag_words, stop_words, by = "word")
-  
-  
+  #Apply tfidf
   tag_words <- tag_words %>%
-    bind_tf_idf(word,Tags,n)
+  bind_tf_idf(word,Tags,n)
   
   
-  tag_words
+  # A filter to not leave out tags themselves
+  tag_words_no_idf <- tag_words %>% filter(idf == 0) %>% filter(word == Tags)
   
-  tag_words %>% arrange(desc(tf_idf))
-  
-  ##Select top_15 words of tf_idf ###########
-  tag_words %>%
-    arrange(desc(tf_idf)) %>%
-    mutate(word = factor(word, levels = rev(unique(word)))) %>% 
-    group_by(Tags) %>% 
-    top_n(15) %>% 
-    ungroup %>%
-    ggplot(aes(word, tf_idf, fill = Tags)) +
-    geom_col(show.legend = FALSE) +
-    labs(x = NULL, y = "tf-idf top 15 words") +
-    facet_wrap(~Tags, ncol = 5, scales = "free") +
-    coord_flip()
-  
-  #############Cast the DTM #############
-  
+  #############Cast DTM #############
   title_dtm <- tag_words %>%
     arrange(desc(tf_idf)) %>%
-    top_n(50) %>%
-    group_by(Tags) %>% 
+    top_n(150) %>%
+   rbind(tag_words_no_idf) %>%
+    group_by(Tags) %>%
     cast_dtm(Tags, word, n)
-  
+
   return(title_dtm)
-  
 }
 
 
+#############Plots ################
+library(ggplot2)
+
+#Number of words 'n' occuring in total tags distribution plot #########
+ggplot(tag_words, aes(n/total, fill = Tags)) +
+  geom_histogram(show.legend = FALSE) +
+  xlim(NA, 0.0009) +
+  facet_wrap(~Tags, ncol = 2, scales = "free_y")
 
 
-####### LDA ###############################
+####Zip's frequency is inversly proportional to rank
+freq_by_rank <- tag_words %>% 
+  group_by(Tags) %>% 
+  mutate(rank = row_number(), 
+         `term_frequency` = n/total)
+
+
+#####Plot Zip's Law showing inverse proportion relationship #########
+ggplot(data = freq_by_rank,aes(x=rank,y=term_frequency,color=Tags)) + 
+  geom_line(size = 0.4, alpha = 0.8, show.legend = T) + scale_x_log10() + scale_y_log10()
+
+
+##Select top words of tf_idf ###########
+tag_words %>%
+  arrange(desc(tf_idf)) %>%
+  mutate(word = factor(word, levels = rev(unique(word)))) %>% 
+  group_by(Tags) %>% 
+  top_n(15) %>% 
+  ungroup %>%
+  ggplot(aes(word, tf_idf, fill = Tags)) +
+  geom_col(show.legend = FALSE) +
+  labs(x = NULL, y = "tf-idf top 15 words") +
+  facet_wrap(~Tags, ncol = 5, scales = "free") +
+  coord_flip()
+
+
+
+####### LDA Topic Modelling ###############################
 
 library(topicmodels)
 library(stats)
 library(stringr)
+library(ggplot2)
+library(dplyr)
 
-intrain <- perfComputationForLDA(samples_q)
+#samples_q <- questions[sample(nrow(questions), 80000), ]
+trainNum <- createDataPartition(as.factor(questions$Tags),p = .95,list=F)
 
-intest <- perfComputationForLDA(samples_q_test)
-title_tags_lda <- LDA(intrain, k = 16, control = list(seed = 1234),method = "VEM")
-title_tags_lda
+trainSample <- questions[trainNum,]
+validateSample <- questions[-trainNum,]
+intrain <- perfComputationForLDA(trainSample)
+intest <- perfComputationForLDA(validateSample)
+
+LDA_Tags <- LDA(intrain, k = 15, control = list(seed = 111),method = "VEM")
+
+### Tags belonging to topic ########
+ldaStats <- posterior(LDA_Tags)
 
 
+### A beta or gamma matrix to get title and topic###
+title_topics <- tidy(LDA_Tags, matrix = "beta")
 
-title_topics <- tidy(title_tags_lda, matrix = "beta")
-title_topics
-
+#### LDA Topic_Term Plot ########################
 top_terms <- title_topics %>%
   group_by(topic) %>%
-  top_n(5, beta) %>%
+  top_n(10, beta) %>%
   ungroup() %>%
   arrange(topic, -beta)
-
-top_terms
 
 top_terms %>%
   mutate(term = reorder(term, beta)) %>%
@@ -151,28 +148,30 @@ top_terms %>%
 
 
 
-
 ############ Make Predictions #####################
-test.topics <- posterior(title_tags_lda,intest)
-(test.topics <- apply(test.topics$topics, 1, which.max))
+test.topics <- posterior(LDA_Tags,intest)
 
+test.topics
+(test.topics <- apply(test.topics$topics,1, which.max))
 
 #using tidy with gamma gets document probabilities into topic
 #but you only have document, topic and gamma
+colnames(trainSample)[10] <- "document"
 
-colnames(samples_q)[9] <- "Title"
-colnames(samples_q)[10] <- "Tags"
-source_topic_relationship <- tidy(title_tags_lda, matrix = "gamma") %>%
-  #join to orig tidy data by doc to get the source field
-  inner_join(samples_q, by = "document") %>%
-  select(document, topic, gamma) %>%
+#colnames(validateSample)[10] <- "document"
+source_topic_relationship <- tidy(LDA_Tags, matrix = "gamma") %>%
+  #join to orig tidy data by document to get the source
+  inner_join(trainSample, by = "document") %>%
+  dplyr::select(document, topic, gamma) %>%
   group_by(document, topic) %>%
   #get the avg doc gamma value per source/topic
-  mutate(mean = mean(gamma)) %>%
-  #remove the gamma value as you only need the mean
-  select(-gamma) %>%
-  #removing gamma created duplicates so remove them
+  mutate(avg = mean(gamma)) %>%
+  #remove the gamma value
+  dplyr::select(-gamma) %>%
+  #take all non duplicates
   distinct()
+
+##View(source_topic_relationship)
 
 #relabel topics to include the word Topic
 source_topic_relationship$topic = paste("Topic", source_topic_relationship$topic, sep = " ")
@@ -194,22 +193,21 @@ grid.col = c("android" = "#FF5733",
              "python" = "#064115",
              "r" = "#FF0909",
              "sql" = "#996B97",
-             "Topic 1" ="grey",
-             "Topic 2" ="grey",
-             "Topic 3" ="grey",
-             "Topic 4" ="grey",
-             "Topic 5" ="grey",
-             "Topic 6" ="grey",
-             "Topic 7" ="grey",
-             "Topic 8" ="grey",
-             "Topic 9" ="grey",
-             "Topic 10" ="grey",
-             "Topic 11" ="grey",
-             "Topic 12" ="grey",
-             "Topic 13" ="grey",
-             "Topic 14" ="grey",
-             "Topic 15" ="grey",
-             "Topic 16" ="grey")
+             "T1" ="grey",
+             "T2" ="grey",
+             "T3" ="grey",
+             "T4" ="grey",
+             "T5" ="grey",
+             "T6" ="grey",
+             "T7" ="grey",
+             "T8" ="grey",
+             "T9" ="grey",
+             "T10" ="grey",
+             "T11" ="grey",
+             "T12" ="grey",
+             "T13" ="grey",
+             "T14" ="grey",
+             "T15" ="grey")
 
 
 library(tidytext) #text mining, unnesting
@@ -225,228 +223,232 @@ library(formattable) #color tile and color bar in `kables`
 library(tm) #text mining
 library(circlize) #already loaded, but just being comprehensive
 library(plotly)
+
 # set the global parameters for the circular layout. Specifically the gap size (15)
 #this also determines that topic goes on top half and source on bottom half
-circos.par(gap.after = c(rep(5, length(unique(source_topic_relationship[[1]])) - 1), 15,
-                         rep(5, length(unique(source_topic_relationship[[2]])) - 1), 15))
 
+#circos.par(gap.after = c(rep(5, length(unique(source_topic_relationship[[1]])) - 1), 15,
+                         #rep(5, length(unique(source_topic_relationship[[2]])) - 1), 15))
 
 #main function that draws the diagram. transparancy goes from 0-1
-chordDiagram(source_topic_relationship, grid.col = grid.col, transparency = .2)
+chordDiagram(source_topic_relationship, transparency = 0.5,
+             preAllocateTracks = list(track.height = 0.09), grid.col = grid.col)
 title("Relationship Between Topic and Source")
+#Clear the circos plot
+circos.clear()
 
-
-
-text = "Implement multi class classification using SVM in R"
-text1 = "Implement multi class classification using SVM in python"
-pData = data.frame("Title"=c(text,text1),"Tags"=c("doc1","doc2"),stringsAsFactors = FALSE)
-class(samples_q$Title)
-pData$Title
-inPred = perfComputationForLDA(pData)
-
-test.topics <- posterior(title_tags_lda,inPred)
+####### A simple test for topic assignment ############
+#Questions:
+# Reading data from CSV into dataframe with multiple delimiters efficiently
+# The prediction seems to be good however it is dependent with the titles seen so far.
+# A lda model trained on a very large data with diverse topics could yeld even more better result
+text = "Django - getting a list of groups of a loggedin user. No data"
+pData = data.frame("Title"=c(text),"Tags"=c("doc1"),stringsAsFactors = FALSE)
+predee = perfComputationForLDA(pData)
+test.topics <- posterior(LDA_Tags,predee)
 (test.topics <- apply(test.topics$topics, 1, which.max))
-
-(inPred.topics <- apply(inPred$topics, 1, which.max))
-
-tag_words <- posts_words_pred %>%
-  bind_tf_idf(word,n)
-
-library(shiny)
-# Define UI for miles per gallon app ----
-ui <- fluidPage(
-  
-  # Copy the line below to make a text input box
-  textInput("text", label = h3("Stack Overflow Title"), placeholder = "Stackoverflow Title"),
-  
-  hr(),
-  fluidRow(column(3, verbatimTextOutput("value")))
-  
-)
-
-server <- function(input, output) {
-  
-  
-}
-
-shinyApp(ui, server)
+title_topics %>% filter(topic == test.topics[[1]]) %>% filter(beta <= max(beta)) %>% top_n(2)
 
 
 
 
+#################### Classification Models for Prediction ##############################
+# Start
+# build models for tag recommendation
 
-
-title_tags_lda$topics
-
-samples_qFM <- dfmGen(questions)
-samples_qFM <- samples_qFM %>% dplyr::select(-document)
-Tags = questions$Tags
-samples_qFM <- cbind(samples_qFM,Tags)
-set.seed(100)
-trainNum <- createDataPartition(as.factor(questions$Tags),p = .75,list=F)
-train <- samples_qFM[trainNum,]
-test <- samples_qFM[-trainNum,]
-
-
-
-train <- train %>% dplyr::select(-document)
-train <- train %>% dplyr::select(-document)
-trainTags = train$Tags
-testTags = test$Tags
-
-inTraining <- cbind(trainFM,trainTags)
-inTest <- cbind(testFM,testTags)
-convert(inTraining,to="dfm")
-
+##############################
+#
+# train_questions to be added
+#Would be good to add variable Importance
+#
+##############################
+# get most representative words
+# group all the words by each tag and get the top relevant words per tag (tf-idf)
+top_words <- train_questions %>%
+  group_by(Tags) %>%
+  unnest_tokens(output = word, input = Text) %>% 
+  count(Tags, word) %>%
+  bind_tf_idf(term = word, document = Tags, n = n) %>% 
+  # sort by descending tf-idf
+  arrange(desc(tf_idf)) %>% 
+  group_by(Tags) %>%
+  slice(1:60)
 
 
 
-library(doParallel)
-cl <- makePSOCKcluster(4)
-registerDoParallel(cl)
+######### create document term matrix ###########
 
-fitControl <- trainControl(method = 'repeatedcv',
-                           number = 2,
-                           repeats = 3,
-                           allowParallel = TRUE,
-                           classProbs = FALSE)
+# remove words from tidy_questions that are not in top_words and 
+# create a document term matrix
+dtm <- train_questions %>% 
+  unnest_tokens(word, Text) %>% 
+  filter(word %in% top_words$word) %>% 
+  # get count of each token in each document
+  count(Id, word) %>% 
+  # create a document-term matrix with all features and tf weighting
+  cast_dtm(document = Id, term = word, value = n,
+           weighting = tm::weightTfIdf)
 
 
-#inTraining$trainTags
-
-#sum(is.na(inTraining))
-
-model <- train(y=train$Tags,x=train[, names(train) != "Tags"],method="rf",trainControl = fitControl)
-
-## When you are done:
-stopCluster(cl)
-
-detach("package:caret", unload=TRUE)
-pred <- predict(model$finalModel,test)
-
-out <- confusionMatrix(pred, test$Tags, mode = "everything")
-out
-trainFM$trainTags
+# get the doc ids and extract their classes to create the class vector y
+rows <- dtm$dimnames$Docs
+y <- train_questions %>% 
+  filter(Id %in% rows) %>% 
+  pull(Tags) %>%
+  factor()
+# cast as a dataframe to feed to classifiers
+dtm_tbl <- as_tibble(as.matrix(dtm))
 
 
 
-unique(samples_q$Tags)
+######### train test split ###########
 
-prep_fun = tolower
-tok_fun = word_tokenizer
-stop_words = stopwords::data_stopwords_smart
+# get random indices to split train and test sets
+#indices <- sample(1:nrow(dtm_tbl), floor(0.70*nrow(dtm_tbl)))
+indices <- createDataPartition(y=y, p=0.75, list=FALSE)  
 
-it_train = itoken(samples_q$Title, 
-                  preprocessor = prep_fun, 
-                  tokenizer = tok_fun, 
-                  ids = samples_q$Id, 
-                  progressbar = FALSE)
-
-vocab = create_vocabulary(it_train,stopwords=as.character(stop_words),ngram = c(1L,2L))
-
-vocabDf <- as.data.frame(vocab)
-
-
-bigram_vectorizer = vocab_vectorizer(vocab)
-
-dtm_train = create_dtm(it_train, bigram_vectorizer)
-
-dim(dtm_train)
-
-tdm2 <- removeSparseTerms(dtm_train, sparse = 0.2)
-tdm_Matrix <- as.matrix(tdm2)
+X_train <- dtm_tbl[indices,]
+y_train <- y[indices]
+X_test <- dtm_tbl[-indices,]
+y_test <- y[-indices]
 
 
 
 
+############# classification ###############
+
+# train a nearest centroid classifier
+nm_classifier <- klaR::nm(x=X_train, grouping=y_train)
+# predict
+predictions <- predict(nm_classifier, newdata = X_test)$class
+# accuracy
+paste0('accuracy: ', mean(y_test == predictions))
 
 
-# library(h2o)
-# h2o.init()
+
+
+# train a multinomial naive bayes classifier
+
+#indices <- createDataPartition(y=y, p=0.25, list=FALSE)  
+indices <- sample(1:nrow(dtm_tbl), floor(0.70*nrow(dtm_tbl)))
+
+test_dfm <- as.dfm(dtm[indices,])
+test_y <- y[indices]
+
+dfm <- as.dfm(dtm)
+
+nb_classifier <- textmodel_nb(dfm, y = y, distribution = "multinomial")
+
+test_dfm <- dfm_select(test_dfm, pattern = dfm, 
+                       selection = "keep")
+
+predicted_class <- predict(nb_classifier, newdata = test_dfm)
+
+paste0('accuracy: ', mean(test_y == predicted_class))
+
+class_table <- table(test_y, predicted_class)
+confusionMatrix(class_table, mode = "everything")
+
+##############################################################################################
+
+
+#################################################
+#
+#An attempt to visualize LDA Vis using TSNE, 
+# commented as the work is not complete
+#
+#################################################
+# library(tm)
+# library(text2vec)
+# library(lda)
+# titles <- VCorpus(VectorSource(questions$Title))
 # 
-# job.titles.path = "https://raw.githubusercontent.com/h2oai/sparkling-water/rel-1.6/examples/smalldata/craigslistJobTitles.csv"
 # 
-# job.titles <- h2o.importFile(job.titles.path, destination_frame = "jobtitles",
-#                              col.names = c("category", "jobtitle"), col.types = c("Enum", "String"), header = TRUE)
+# titles <- tm_map(titles,removePunctuation)  
 # 
-# STOP_WORDS = c("ax","i","you","edu","s","t","m","subject","can","lines","re","what",
-#                "there","all","we","one","the","a","an","of","or","in","for","by","on",
-#                "but","is","in","a","not","with","as","was","if","they","are","this","and","it","have",
-#                "from","at","my","be","by","not","that","to","from","com","org","like","likes","so","using")
 # 
-# tokenize <- function(sentences, stop.words = STOP_WORDS) {
-#   tokenized <- h2o.tokenize(sentences, "\\\\W+")
-#   
-#   # convert to lower case
-#   tokenized.lower <- h2o.tolower(tokenized)
-#   # remove short words (less than 2 characters)
-#   tokenized.lengths <- h2o.nchar(tokenized.lower)
-#   tokenized.filtered <- tokenized.lower[is.na(tokenized.lengths) || tokenized.lengths >= 2,]
-#   # remove words that contain numbers
-#   tokenized.words <- tokenized.filtered[h2o.grep("[0-9]", tokenized.filtered, invert = TRUE, output.logical = TRUE),]
-#   
-#   # remove stop words
-#   tokenized.words[is.na(tokenized.words) || (! tokenized.words %in% STOP_WORDS),]
+# for (j in seq(titles)) {
+#   titles[[j]] <- gsub("-", " ", titles[[j]])
+#   titles[[j]] <- gsub("\u2028", " ", titles[[j]])
 # }
 # 
-# predict <- function(job.title, w2v, gbm) {
-#   words <- tokenize(as.character(as.h2o(job.title)))
-#   job.title.vec <- h2o.transform(w2v, words, aggregate_method = "AVERAGE")
-#   h2o.predict(gbm, job.title.vec)
+# titles <- tm_map(titles, PlainTextDocument)
+# 
+# titles <- tm_map(titles, tolower)   
+# titles <- tm_map(titles,removeWords,stop_words)
+# titles <- tm_map(titles, PlainTextDocument)
+# 
+# titles <- tm_map(titles, stripWhitespace)
+# 
+# titles <- tm_map(titles, PlainTextDocument)
+# 
+# titles_dtm <- DocumentTermMatrix(titles)   
+# #inspect(titles_dtm)   
+# 
+# 
+# topicmodels_json_ldavis <- function(fitted, corpus, doc_term){
+#   # Required packages
+#   library(topicmodels)
+#   library(dplyr)
+#   library(stringi)
+#   library(tm)
+#   library(LDAvis)
+#   
+#   # Find required quantities
+#   phi <- posterior(fitted)$terms %>% as.matrix
+#   theta <- posterior(fitted)$topics %>% as.matrix
+#   vocab <- colnames(phi)
+#   doc_length <- vector()
+#   for (i in 1:NROW(corpus)) {
+#     temp <- paste(corpus$Title[i], collapse = ' ')
+#     doc_length <- c(doc_length, stri_count(temp, regex = '\\S+'))
+#   }
+#   temp_frequency <- inspect(doc_term)
+#   freq_matrix <- data.frame(ST = colnames(doc_term),
+#                             Freq = colSums(as.matrix(doc_term)))
+#   rm(temp_frequency)
+#   
+#   # Convert to json
+#   json_lda <- LDAvis::createJSON(phi = phi, theta = theta,
+#                                  vocab = vocab,
+#                                  doc.length = doc_length,
+#                                  term.frequency = freq_matrix$Freq)
+#   
+#   return(json_lda)
 # }
 # 
-# questions.hex <- as.h2o(questions)
-# #Convert to categorical
-# questions.hex["Tags"] <- as.factor(questions.hex["Tags"])
-# #Print the types of h2o dataframe
-# h2o.getTypes(questions.hex)
+# 
+# # Find required quantities
+# phi <- posterior(title_tags_lda)$terms %>% as.matrix
+# theta <- posterior(title_tags_lda)$topics %>% as.matrix
+# 
+# alpha <- 0.01
+# eta <- 0.02
+# 
+# theta <- t(apply(theta + alpha, 2, function(x) x/sum(x)))
+# phi <- t(apply(t(phi) + eta, 2, function(x) x/sum(x)))
+# 
+# dim(phi)
+# dim(theta)
 # 
 # 
-# print("Break job titles into sequence of words")
-# words <- tokenize(questions.hex$Title)
+# doc_length <- c(9,7,11,8,12,10,11,14,12,11,10,15,14,14,16)
 # 
-# print("Build word2vec model")
-# w2v.model <- h2o.word2vec(words, sent_sample_rate = 0, epochs = 10)
+# vocab <- colnames(phi)
 # 
-# print("Sanity check - find synonyms for the word 'teacher'")
-# print(h2o.findSynonyms(w2v.model, "java", count = 10 ))
-# 
+# document <- as.matrix(intrain)
+# freq_matrix <- data.frame(ST = colnames(document),
+#                           Freq = colSums(document))
 # 
 # 
-# print("Calculate a vector for each job title")
-# title.vecs <- h2o.transform(w2v.model, words, aggregate_method = "AVERAGE")
+# library(tsne)
+# svd_tsne <- function(x) tsne(svd(x)$u)
+# # Convert to json
+# json_lda <- LDAvis::createJSON(phi = phi, theta = theta,
+#                                vocab = vocab,
+#                                mds.method = svd_tsne,
+#                                doc.length = doc_length,
+#                                term.frequency = freq_matrix$Freq,R = 5)
 # 
-# print("Prepare training&validation data (keep only titles made of known words)")
-# valid.titles <- ! is.na(title.vecs$C1)
-# 
-# data <- h2o.cbind(questions.hex[valid.titles, "Tags"], title.vecs[valid.titles, ])
-# 
-# 
-# data.split <- h2o.splitFrame(data, ratios = c(0.6,0.2),seed=101)
-# 
-# train <- h2o.assign(data.split[[1]], "train.hex")  
-# 
-# names(train)
-# 
-# ## assign the first result the R variable train
-# ## and the H2O name train.hex
-# valid <- h2o.assign(data.split[[2]], "valid.hex")   ## R valid, H2O valid.hex
-# test <- h2o.assign(data.split[[3]], "test.hex")     ## R test, H2O test.hex
-# 
-# print("Build a basic GBM model")
-# gbm.model <- h2o.gbm(x = names(title.vecs), y = "Tags",
-#                      training_frame = train, validation_frame = valid)
-# 
-# summary(gbm.model)
-# 
-# print("Predict!")
-# finalRf_predictions<-h2o.predict(
-#   object = gbm.model
-#   ,newdata = test)
-# 
-# mean(finalRf_predictions$predict == test$Tags)
-# 
-# h2o.hit_ratio_table(gbm.model,valid = T)[1,2]
-# print(predict("Can't change nextArrow and prevArrow in Slick Carousel", w2v.model, gbm.model))
-# 
-# print(predict("Python IOError: [Errno 22] when creating file", w2v.model, gbm.model))
+# library(LDAvis)
+# serVis(json_lda, out.dir = 'vis1', open.browser = FALSE)

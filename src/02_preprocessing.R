@@ -1,6 +1,7 @@
 # 02_preprocessing.R
 # data cleaning and preprocessing
 
+library(dplyr)
 
 ############ Preprocess Posts ############
 
@@ -56,11 +57,11 @@ answers <- answers %>%
 
 # remove the time part of the datetime columns as time isn't meaningful 
 questions <- questions %>%
-    mutate(CreationDate = as.Date(CreationDate, tryFormats = c("%Y%m%d"))) %>%
-    mutate(LastActivityDate = as.Date(LastActivityDate, tryFormats = c("%Y%m%d")))
+    transform(CreationDate = as.Date(CreationDate, tryFormats = c("%Y%m%d"))) %>%
+    transform(LastActivityDate = as.Date(LastActivityDate, tryFormats = c("%Y%m%d")))
 # same as above
 answers <- answers %>%
-    mutate(CreationDate = as.Date(CreationDate, tryFormats = c("%Y%m%d")))
+    transform(CreationDate = as.Date(CreationDate, tryFormats = c("%Y%m%d")))
 
 
 # make all NA cols to 0 for not having any NULLS
@@ -215,7 +216,5 @@ users <- users %>%
     rowwise() %>% 
     mutate(TidyAboutMe = CleanText(AboutMe)) %>% 
     ungroup
-
-
 
 #############################################

@@ -4,9 +4,8 @@
 library("tryCatchLog")
 
 # source configurations first
-source("SO_config.R")
-# source util.R
 source("util.R")
+source("SO_config.R")
 
 xmls <- c()
 ne_csvs <- c()
@@ -86,7 +85,9 @@ source('01_import.R')
 
 # perform preprocessing to prepare data
 source('02_preprocessing.R')
-source('03_preprocessing.R')
+
+# Predictions
+source("03_predictions.R")
 
 
 
