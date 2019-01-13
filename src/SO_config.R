@@ -5,7 +5,7 @@
 # Just add any package and it will install/load it#######
 packages <- c("dplyr","XML","tm","textmineR","gsubfn","SnowballC","textstem","tidytext",
               "sentimentr","wordcloud","gender","corrplot","stringr","ggplot2","lubridate",
-              "rvest","magrittr","shiny","leaflet","readr","h2o","caret")
+              "rvest","magrittr","shiny","leaflet","readr","caret")
 ipak(packages)
 
 # Do not Change this #################

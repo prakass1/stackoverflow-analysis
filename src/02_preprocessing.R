@@ -1,9 +1,7 @@
 # 02_preprocessing.R
 # data cleaning and preprocessing
 
-
-
-
+library(dplyr)
 
 ############ Preprocess Posts ############
 
@@ -53,9 +51,9 @@ answers_cols <- c("Id",
 
 # keep only selective columns
 questions <- questions %>% 
-    select(questions_cols)
+    dplyr::select(questions_cols)
 answers <- answers %>% 
-    select(answers_cols)
+    dplyr::select(answers_cols)
 
 # remove the time part of the datetime columns as time isn't meaningful 
 questions <- questions %>%
@@ -71,13 +69,11 @@ questions[is.na(questions)] <- 0
 
 
 
-#### Filter to have only the top 15 tags by questions######
-## May be we can give our custom tags too ##########
-
-# apply the filterTags function on the values in the Tags column. 
-# This will replace the tags with empty strings, if they are not in the top 15 selected tags
-questions["Tags"] <- apply(questions["Tags"], 1, filterTags)
-# remove the questions that do not have a top 15 tag
+# apply the filterOneTag function on the values in the Tags column. 
+# This will replace the Tags column only tags that are in the top 15 selected tags
+# and the rest will be replaced with empty strings
+questions["Tags"] <- apply(questions["Tags"], 1, filterOneTag)
+# remove questions that have empty strings in the Tags columns
 questions <- questions %>% 
     filter(Tags != "")
 
@@ -89,14 +85,15 @@ questions <- questions %>%
     rowwise() %>% 
     mutate(Links = GetLinks(Body), Code = GetCode(Body)) %>% 
     mutate(Body = GetParagraphContents(Body)) %>% 
-    mutate(HasLinks = if_else(Links != "", 1, 0), HasCode = if_else(Code != "", 1, 0))
+    mutate(HasLinks = if_else(Links != "", 1, 0), HasCode = if_else(Code != "", 1, 0)) %>% 
+    ungroup()
 # same as above
 answers <- answers %>% 
     rowwise() %>% 
     mutate(Links = GetLinks(Body), Code = GetCode(Body)) %>% 
     mutate(Body = GetParagraphContents(Body)) %>% 
-    mutate(HasLinks = if_else(Links != "", 1, 0), HasCode = if_else(Code != "", 1, 0))
-
+    mutate(HasLinks = if_else(Links != "", 1, 0), HasCode = if_else(Code != "", 1, 0)) %>% 
+    ungroup()
 
 
 #############################################
@@ -132,19 +129,12 @@ comments_cols <- c("Id",
 
 # keep only selected columns
 comments <- comments %>% 
-    select(comments_cols)
+    dplyr::select(comments_cols)
 
 
 # remove the time part of the CreationDate column as time is not meaningful
 comments <- comments %>% 
     mutate(CreationDate = as.Date(CreationDate, tryformats=c("Y%m%d")))
-
-
-#comments <- comments %>% 
-#    rowwise() %>% 
-#    mutate(Links = GetLinks(Body), Code = GetCode(Body)) %>% 
-#    mutate(Body = GetParagraphContents(Body)) %>% 
-#    mutate(HasLinks = if_else(Links != "", 1, 0), HasCode = if_else(Code != "", 1, 0))
 
 
 
@@ -160,7 +150,8 @@ comments <- comments %>%
 ############ Preprocess Users ############
 
 # 1. remove the users who haven't recently posted a question, answer, or comment
-# 2. add a new column JoinedRecently
+# 2. add a new column JoinedRecently, and also a Score column (upvotes - downvotes)
+# 3. get links and code from users AboutMe and put them in separate columns
 
 
 users_cols <- c("Id",
@@ -179,7 +170,7 @@ users_cols <- c("Id",
 
 # keep only selective columns
 users <- users %>% 
-    select(users_cols)
+    dplyr::select(users_cols)
 
 
 # filter the users that are in posts and comments (recently active)
@@ -200,11 +191,8 @@ users <- users %>%
     mutate(CreationDate = as.Date(CreationDate, tryformats=c("Y%m%d"))) %>% 
     mutate(Score = UpVotes - DownVotes) %>% 
     mutate(JoinedRecently = JoinedRecently(CreationDate)) %>% 
-    select(-c(UpVotes, DownVotes))
+    dplyr::select(-c(UpVotes, DownVotes))
     
-
-
-
 
 
 # extract Links and Code from the AboutMe column (after converting to lower case) 
@@ -217,11 +205,16 @@ users <- users %>%
     mutate(AboutMe = tolower(AboutMe)) %>% 
     mutate(Links = GetLinks(AboutMe), Code = GetCode(AboutMe)) %>% 
     mutate(AboutMe = GetParagraphContents(AboutMe)) %>% 
-    mutate(HasLinks = if_else(Links != "", 1, 0), HasCode = if_else(Code != "", 1, 0))
+    mutate(HasLinks = if_else(Links != "", 1, 0), HasCode = if_else(Code != "", 1, 0)) %>% 
+    ungroup()
 
-# make all NA cols to 0 for not having any NULLS
+# make all NA cols to '' so there are no NULLS
 users[is.na(users)] <- ""
 
-
+# clean users AboutMe
+users <- users %>%
+    rowwise() %>% 
+    mutate(TidyAboutMe = CleanText(AboutMe)) %>% 
+    ungroup
 
 #############################################

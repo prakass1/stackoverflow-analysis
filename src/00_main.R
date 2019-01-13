@@ -4,6 +4,7 @@
 library("tryCatchLog")
 
 # source configurations first
+source("util.R")
 source("SO_config.R")
 
 xmls <- c()
@@ -12,8 +13,6 @@ ne_csvs <- c()
 # check if csvs exist
 count <-0
 
-# source util.R
-source("util.R")
 
 for(val in files){
     print(paste0(csv_loc, val, ext))
@@ -86,4 +85,9 @@ source('01_import.R')
 
 # perform preprocessing to prepare data
 source('02_preprocessing.R')
+
+# Predictions
+source("03_predictions.R")
+
+
 

@@ -13,3 +13,7 @@ corrplot(scoresCol, method="color",
          tl.col="black", tl.srt=0, #Text label color and rotation
          # hide correlation coefficient on the principal diagonal
          diag=FALSE )
+
+
+
+

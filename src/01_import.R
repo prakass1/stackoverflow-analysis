@@ -58,6 +58,8 @@ users_names <- c("Id",
 
 start_time <- Sys.time()
 
+
+# import data from csvs
 posts <- read_csv(paste0(csv_loc, "posts.csv"),
                   col_names = TRUE
                   )

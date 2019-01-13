@@ -2,6 +2,25 @@
 # contains utility functions used by other files
 
 
+#15 selected tags
+selected_tags <- c("android",
+                   "c",
+                   "c#",
+                   "c++",
+                   "html",
+                   "css",
+                   "ios",
+                   "java",
+                   "javascript",
+                   "jquery",
+                   "mysql",
+                   "php",
+                   "python",
+                   "r",
+                   "sql")
+
+
+
 # input: @filepath: the path with extension of the xml to read, @query: xpath query to select nodes
 # returns a dataframw with the parsed xml contents
 ReadXMLToDf <- function(filepath, query){
@@ -24,22 +43,6 @@ WriteToCsv <- function(df, loc){
 
 
 
-#15 selected tags
-selected_tags <- c("android",
-                   "c",
-                   "c#",
-                   "c++",
-                   "html",
-                   "css",
-                   "ios",
-                   "java",
-                   "javascript",
-                   "jquery",
-                   "mysql",
-                   "php",
-                   "python",
-                   "r",
-                   "sql")
 
 # input: @x: character vector of tags
 # returns the tags if at least one tag is in the top 15 selected tags, else returns an empty string
@@ -72,16 +75,150 @@ filterOneTag <- function(x){
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# input: @text: a string
+# performs contraction relacement, lowercasing, numbers and punctuation removal, 
+# stopwords removal, stemming, lemmatization, and white space removal
+CleanText <- function(text){
+    text <- text %>% ReplaceContractions() %>% 
+        ToLowerCase() %>% 
+        RemoveNumbersAndPunctuation() %>% 
+        RemoveStopwords() %>% 
+        #Stem() %>% 
+        #Lemmatize() %>% 
+        RemoveWhiteSpace()
+    return (text)
+}
+
+
+
+# input: @x: a string
+# uses the textclean package to replace contractions
+ReplaceContractions <- function(text){
+    text <- text %>% replace_contraction(contraction.key = lexicon::key_contractions, 
+                                         ignore.case = TRUE)
+    return (text)
+}
+
+
+# input: @x: a string
+# returns the text with converted to lowercase
+ToLowerCase <- function(text){
+    text <- tokens(text, what = "word") %>% 
+        tokens_tolower(language = quanteda_options("language_stemmer"))
+    return (paste(text, collapse = " "))
+}
+
+# input: @x: a string
+# returns the text with non ascii characters removed
+RemoveUnicode <- function(text){
+    return(iconv(text, "latin1", "ASCII", sub=""))
+}
+
+# input: @x: a string
+# returns the text with all punctuation and numbers removed
+RemoveNumbersAndPunctuation <- function(text){
+    text <- (iconv(text, "latin1", "ASCII", sub=""))
+    #text <- gsub("<.+>", "", text)
+    return (gsub("([0-9]+|[[:punct:]]+)", " ", text))
+}
+
+# input: @x: a string
+# returns the text with stopwords removed
+RemoveStopwords <- function(text){
+    # tokenize the text and use the quanted stopwords list to remove stopwords
+    text <- tokens(text, what = "word") %>% 
+        tokens_select(stopwords(), selection = "remove")
+    return (paste(text, collapse = " "))
+}
+
+# input: @x: a string
+# lemmatizes the text using the textstem package
+Lemmatize <- function(text){
+    return (lemmatize_strings(text))
+}
+
+# input: @x: a string
+# returns the text with all punctuations removed
+RemoveWhiteSpace <- function(text){
+    return (gsub("\\s+", " ", text))
+}
+
+# input: @x: a string
+# tokenizes the text and performs stemming on the tokens
+Stem <- function(text){
+    # tokenize the text and use the quanteda stemmer
+    text <- tokens(text, what = "word") %>% 
+        tokens_wordstem(language = "english")
+    return (paste(text, collapse = " "))
+}
+
+
+
+
+
+
+# input: @text: a string 
+# pulls the nouns and proper nouns from text and returns them as a string
+ExtractPOS <- function(text){
+    text <- udpipe_annotate(ud_model, text) %>% 
+        as_tibble() %>% 
+        filter(upos == "NOUN" | upos == "PROPN")
+    paste(text$token, collapse=" ")
+}
+
+
+
+
+
+
+# input: @df: a dataframe
+# returns a Document Term Matrix (to return a Term Document Matrix, change the function name to TermDocumentMatrix)
+DocumentTermMatrix <- function(df){
+    #corpus <- Corpus (VectorSource(df$TidyBody)) 
+    corpus <- Corpus (VectorSource(df)) 
+    tdmcorpus <- DocumentTermMatrix(corpus)
+    return(tdmcorpus)
+}
+
+
+
+
+
+
+
+
+
 # input: @x: a character vector.
 # extracts all links using rvest functions
 # returns the links as one character vector separated by commas
 GetLinks <- function(x){
     # if a link is found
-    if (grepl("https://", x, fixed = TRUE) == TRUE){
+    if (grepl("http://", x, fixed = TRUE) == TRUE | grepl("https://", x, fixed = TRUE) == TRUE){
         #extract contents of href
-        link <- read_html(x) %>% 
-            html_nodes("a") %>% 
-            html_attr("href")
+        link <- tryCatch({
+                read_html(x) %>% 
+                html_nodes("a") %>% 
+                html_attr("href")
+            }, error = function(e){
+                ""
+            }, finally = {
+                ""
+            }
+        )
     }
     else{
         link = ""
@@ -168,49 +305,14 @@ SentimentOfComments <- function(comments, post_id){
 
 
 
-# input: @text: a character vector
-# removes numbers and punctuation, and then stems and lemmatizes the text
-CleanText <- function(text){
-    text <- gsub("([0-9]+|[[:punct:]]+)", " ", text) %>% 
-        wordStem(language = "english") %>% 
-        lemmatize_strings()
-    text <- gsub("\\s+", " ", text)
-    return (text)
-}
-
-# input: @x: a character vector
-# returns the text with stopwords removed
-RemoveStopwords <- function(x){
-    try_corpus <- Corpus(VectorSource(x)) %>% 
-        tm_map(content_transformer(tolower)) %>% 
-        tm_map(removeWords, stopwords("en"))
-    return(try_corpus$content)
-}
 
 
 
-
-# input: @df: a dataframe
-# returns a Document Term Matrix (to return a Term Document Matrix, change the function name to TermDocumentMatrix)
-DocumentTermMatrix <- function(df){
-    #corpus <- Corpus (VectorSource(df$TidyBody)) 
-    corpus <- Corpus (VectorSource(df)) 
-    tdmcorpus <- DocumentTermMatrix(corpus)
-    return(tdmcorpus)
-}
-
-
-
-
-#######################################
-
-
-
-
-GetLocation <- function(id){
-    location <- users %>% 
-        filter(Id == id) %>% 
-        select(Location)
+# returns the location of a user, given a user Id
+GetUserLocation <- function(user_id){
+    location <- users_with_locations %>% 
+        filter(Id == user_id) %>% 
+        pull(Location)
     return (location)
 }
 

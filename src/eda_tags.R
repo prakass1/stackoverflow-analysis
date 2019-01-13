@@ -1,16 +1,9 @@
-#eda_tags.R
-
-
-
-# apply the filterOneTag function on the Tags column of questions
-# this will make the Tags column have only one tag
-questions_one_tag <- questions
-questions_one_tag["Tags"] <- apply(questions["Tags"], 1, filterOneTag)
-questions_one_tag <- questions_one_tag %>% filter(Tags != "")
+# eda_tags.R
+# visualizations
 
 
 # questions grouped by total answer count, comment count, and sum of scores of tags
-tags_summary <- questions_one_tag %>%
+tags_summary <- questions %>%
     group_by(Tags) %>%
     summarise(sum_answer_count = sum(AnswerCount),
               sum_comment_count = sum(CommentCount),
@@ -21,12 +14,7 @@ tags_summary <- questions_one_tag %>%
 
 
 
-
-
-# random sample questions and filter comments that are in the sample
-questions_sample <- sample_n(questions_one_tag, 10000)
-
-# create a TidyText column for comments that contains preprocessed text
+# create a TidyText column for comments that contain preprocessed text
 comments <- comments %>% 
     rowwise() %>% 
     mutate(TidyBody = CleanText(Text))
@@ -107,6 +95,76 @@ avg_score_all <- tags_summary %>%
     mean()
 
 ks <- ks.test(x = avg_score, y = rep(avg_score_all, times=nrow(tags_summary)))
+
+
+
+###########################
+
+
+# group all the words by each tag
+tags_grouped <- questions %>%
+    group_by(Tags) %>%
+    dplyr::summarise(WordsByTag=paste(as.character(TidyBody), collapse=" "))
+
+
+
+tags_tokens <- tags_grouped %>%
+    unnest_tokens(output = word, input = WordsByTag)
+
+tags_dtm <- tags_tokens %>% 
+    # get count of each token in each document
+    count(Tags, word) %>% 
+    # create a document-term matrix with all features and tfidf weighting
+    cast_dtm(document = Tags, term = word, value = n,
+             weighting = tm::weightTfIdf)
+
+# calculate tfidf for each word in each tag
+tags_tfidf <- tags_tokens %>%
+    count(Tags, word) %>%
+    bind_tf_idf(term = word, document = Tags, n = n)
+
+
+# plot top 10 words (based on tfidf) for each Tag
+tag <- c('r', 'java', 'c#', 'sql', 'ios', 'python', 'html', 'css', 'javascript')
+plot_tags <- tags_tfidf %>%
+    filter(Tags %in% tag) %>%
+    arrange(desc(tf_idf)) %>% 
+    group_by(Tags) %>%
+    slice(1:10) 
+
+
+plot_tags %>% 
+    ggplot(aes(word, tf_idf, fill = Tags)) +
+    geom_bar(stat = "identity") +
+    labs(title = paste("Most relevant words by tag"), ylab = NULL, xlab = NULL) +
+    coord_flip() +
+    facet_wrap(~Tags, scales="free") +
+    theme_minimal() +
+    theme(legend.position = "none",
+          axis.text.x=element_blank(),
+          strip.text.x = element_text(size = 10, face="bold"),
+          axis.text=element_text(size=10, face="bold"),
+          axis.title.x=element_text(size=10),
+          plot.title = element_text(size=15, face = "bold"))
+
+
+
+# plot a graph of the top cooccuring words by tag
+desc_word_pairs <- tags_tfidf %>% 
+    pairwise_count(word, Tags, sort = TRUE, upper = FALSE)
+
+desc_word_pairs %>%
+    filter(n >= 6) %>%
+    graph_from_data_frame() %>%
+    ggraph(layout = "fr") +
+    geom_edge_link(aes(edge_alpha = n, edge_width = n), edge_colour = "cyan4") +
+    geom_node_point(size = 5) +
+    geom_node_text(aes(label = name), repel = TRUE, 
+                   point.padding = unit(0.2, "lines")) +
+    labs(title="Most Co-occuring Words in Questions of the Same Tag") +
+    theme_void() +
+    theme(plot.title = element_text(hjust = 0.5))
+
 
 
 
